@@ -4,14 +4,14 @@ from datetime import datetime
 
 import requests
 
-from settings import YANDEX_DISK_API_KEY, BASE_FOLDER_PATH, DATE_FORMAT, INDEX_JSON_PATH
+from settings import YANDEX_DISK_API_KEY, BASE_FOLDER_PATH, INDEX_JSON_PATH
 
 HEADERS = {"Authorization": f"OAuth {YANDEX_DISK_API_KEY}"}
 logger = logging.getLogger(__name__)
 
 def get_target_folder_path():
     """Возвращает полный путь к папке с текущей датой"""
-    date_str = datetime.now().strftime(DATE_FORMAT)
+    date_str = datetime.now().strftime("%Y-%m-%d")
     return f"{BASE_FOLDER_PATH}/{date_str}"
 
 def check_and_create_folder():

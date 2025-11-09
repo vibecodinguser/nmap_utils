@@ -3,7 +3,6 @@ import os
 # Яндекс Диск
 YANDEX_DISK_API_KEY = "your_token_here"
 BASE_FOLDER_PATH = "Приложения/Блокнот картографа Народной карты"
-DATE_FORMAT = "%Y-%m-%d"
 
 # Локальные файлы
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
