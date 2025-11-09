@@ -1,89 +1,259 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>nmap_itils</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nmap_utils</title>
     <style>
+        :root {
+            --primary-color: #4CAF50;
+            --primary-hover: #45a049;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+            --info-bg: #d1ecf1;
+            --info-text: #0c5460;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
             max-width: 600px;
             margin: 50px auto;
             padding: 20px;
+            line-height: 1.6;
+            color: #333;
         }
+
+        h1 {
+            margin-bottom: 30px;
+            color: #2c3e50;
+            text-align: center;
+        }
+
         button {
             padding: 15px 30px;
             font-size: 16px;
             cursor: pointer;
-            background-color: #4CAF50;
+            background-color: var(--primary-color);
             color: white;
             border: none;
             border-radius: 5px;
+            transition: background-color 0.3s ease;
+            width: 100%;
         }
-        button:hover {
-            background-color: #45a049;
+
+        button:hover:not(:disabled) {
+            background-color: var(--primary-hover);
         }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         input[type="file"] {
             display: none;
         }
-        #status {
+
+        .message {
             margin-top: 20px;
-            padding: 10px;
+            padding: 12px 15px;
             border-radius: 5px;
+            display: none;
         }
+
+        .message.show {
+            display: block;
+        }
+
         .success {
-            background-color: #d4edda;
-            color: #155724;
+            background-color: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid #c3e6cb;
         }
+
         .error {
-            background-color: #f8d7da;
-            color: #721c24;
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background-color: var(--info-bg);
+            color: var(--info-text);
+            border: 1px solid #bee5eb;
+        }
+
+        .file-list {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .file-list.show {
+            display: block;
+        }
+
+        .file-item {
+            padding: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ffffff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
 <body>
-    <h1>nmaps utility</h1>
-    {% if error_message %}
-    <div id="error" class="error" style="margin-bottom: 20px;">
+<h1>nmap_utils</h1>
+
+{% if error_message %}
+    <div id="error" class="message error show" role="alert">
         {{ error_message }}
     </div>
-    {% endif %}
-    <button onclick="document.getElementById('fileInput').click()">Выбрать ShapeFile для импорта</button>
-    <input type="file" id="fileInput" multiple accept=".zip" onchange="uploadFiles()">
-    <div id="status"></div>
+{% endif %}
 
-    <script>
-        function uploadFiles() {
-            const files = document.getElementById('fileInput').files;
-            if (files.length === 0) return;
+<button id="selectButton" type="button" aria-label="Выбрать файлы для импорта">
+    Выбрать ShapeFile для импорта
+</button>
 
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files', file);
+<input type="file" id="fileInput" multiple accept=".zip" aria-label="Выбор файлов">
+
+<div id="fileList" class="file-list" role="list"></div>
+
+<div id="status" class="message" role="status" aria-live="polite"></div>
+
+<script>
+    (function () {
+        'use strict';
+
+        const fileInput = document.getElementById('fileInput');
+        const selectButton = document.getElementById('selectButton');
+        const statusDiv = document.getElementById('status');
+        const fileListDiv = document.getElementById('fileList');
+
+        // Обработчик клика по кнопке
+        selectButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Обработчик выбора файлов
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+
+            if (files.length === 0) {
+                hideFileList();
+                return;
             }
 
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = 'Обработка...';
-            statusDiv.className = '';
+            // Показываем список выбранных файлов
+            showFileList(files);
 
-            fetch('/convert', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.textContent = data.message;
-                    statusDiv.className = 'success';
-                } else {
-                    statusDiv.textContent = data.error || 'Ошибка';
-                    statusDiv.className = 'error';
-                }
-            })
-            .catch(error => {
-                statusDiv.textContent = 'Ошибка: ' + error;
-                statusDiv.className = 'error';
-            });
+            // Автоматически загружаем файлы
+            uploadFiles(files);
         }
-    </script>
+
+        function showFileList(files) {
+            fileListDiv.innerHTML = files.map((file, index) =>
+                `<div class="file-item" role="listitem">${index + 1}. ${file.name} (${formatFileSize(file.size)})</div>`
+            ).join('');
+            fileListDiv.classList.add('show');
+        }
+
+        function hideFileList() {
+            fileListDiv.classList.remove('show');
+            fileListDiv.innerHTML = '';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function showMessage(message, className) {
+            statusDiv.textContent = message;
+            statusDiv.className = `message ${className} show`;
+        }
+
+        function hideMessage() {
+            statusDiv.classList.remove('show');
+            statusDiv.textContent = '';
+        }
+
+        async function uploadFiles(files) {
+            if (files.length === 0) return;
+
+            // Валидация файлов на клиенте
+            const invalidFiles = files.filter(file => !file.name.endsWith('.zip'));
+            if (invalidFiles.length > 0) {
+                showMessage('Пожалуйста, выберите только ZIP файлы', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Блокируем кнопку и показываем статус
+            selectButton.disabled = true;
+            selectButton.innerHTML = '<span class="spinner"></span>Обработка...';
+            hideMessage();
+            showMessage('Обработка файлов...', 'info');
+
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Очищаем выбор файлов
+                    fileInput.value = '';
+                    hideFileList();
+                } else {
+                    showMessage(data.error || 'Произошла ошибка', 'error');
+                }
+            } catch (error) {
+                showMessage(`Ошибка: ${error.message || 'Неизвестная ошибка'}`, 'error');
+            } finally {
+                // Разблокируем кнопку
+                selectButton.disabled = false;
+                selectButton.textContent = 'Выбрать ShapeFile для импорта';
+            }
+        }
+    })();
+</script>
 </body>
 </html>
 
