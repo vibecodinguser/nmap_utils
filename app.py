@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, jsonify
-import os
 import logging
-from yandex_disk import check_and_create_folder, download_index_json, upload_index_json
+import os
+
+from flask import Flask, render_template, request, jsonify
+
 from file_processor import process_files
 from settings import PROJECT_DIR, YANDEX_DISK_API_KEY
+from yandex_disk import check_and_create_folder, download_index_json, upload_index_json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

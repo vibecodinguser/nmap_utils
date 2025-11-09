@@ -1,23 +1,30 @@
-import requests
-import os
-import json
 import logging
-from settings import YANDEX_DISK_API_KEY, YANDEX_DISK_API_URL, get_target_folder_path, INDEX_JSON_PATH
+import os
+from datetime import datetime
+
+import requests
+
+from settings import YANDEX_DISK_API_KEY, BASE_FOLDER_PATH, DATE_FORMAT, INDEX_JSON_PATH
 
 HEADERS = {"Authorization": f"OAuth {YANDEX_DISK_API_KEY}"}
 logger = logging.getLogger(__name__)
 
+def get_target_folder_path():
+    """Возвращает полный путь к папке с текущей датой"""
+    date_str = datetime.now().strftime(DATE_FORMAT)
+    return f"{BASE_FOLDER_PATH}/{date_str}"
+
 def check_and_create_folder():
     """Проверяет существование папки, создает если нет"""
     folder_path = get_target_folder_path()
-    url = f"{YANDEX_DISK_API_URL}/resources"
+    url = f"https://cloud-api.yandex.net/v1/disk/resources"
     params = {"path": folder_path}
     
     response = requests.get(url, headers=HEADERS, params=params)
     
     if response.status_code == 404:
         params = {"path": folder_path}
-        response = requests.put(f"{YANDEX_DISK_API_URL}/resources", headers=HEADERS, params=params)
+        response = requests.put(f"https://cloud-api.yandex.net/v1/disk/resources", headers=HEADERS, params=params)
         if response.status_code not in [201, 409]:
             raise Exception(f"Ошибка создания папки: {response.text}")
     
@@ -27,7 +34,7 @@ def download_index_json():
     """Скачивает index.json если существует"""
     folder_path = get_target_folder_path()
     file_path = f"{folder_path}/index.json"
-    url = f"{YANDEX_DISK_API_URL}/resources/download"
+    url = f"https://cloud-api.yandex.net/v1/disk/resources/download"
     params = {"path": file_path}
     
     response = requests.get(url, headers=HEADERS, params=params)
@@ -54,7 +61,7 @@ def upload_index_json():
     folder_path = get_target_folder_path()
     file_path = f"{folder_path}/index.json"
     
-    url = f"{YANDEX_DISK_API_URL}/resources/upload"
+    url = f"https://cloud-api.yandex.net/v1/disk/resources/upload"
     params = {"path": file_path, "overwrite": "true"}
     
     response = requests.get(url, headers=HEADERS, params=params)

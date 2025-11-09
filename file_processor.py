@@ -1,10 +1,12 @@
+import json
+import logging
+import os
+import uuid
+
 import geopandas as gpd
 import pandas as pd
-import uuid
-import json
-import os
-import logging
-from settings import INDEX_JSON_PATH, OUTPUT_TEMPLATE
+
+from settings import INDEX_JSON_PATH
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -162,7 +164,7 @@ def merge_json_data(new_data, existing_data):
 def process_files(file_paths):
     """Обрабатывает список zip файлов"""
     # Сначала загружаем существующие данные
-    existing_data = OUTPUT_TEMPLATE.copy()
+    existing_data = {"paths": {}, "points": {}}
     if os.path.exists(INDEX_JSON_PATH):
         try:
             with open(INDEX_JSON_PATH, "r", encoding="utf-8") as f:
@@ -175,7 +177,7 @@ def process_files(file_paths):
             logger.warning(f"Ошибка чтения index.json: {e}, создаем новый")
     
     # Обрабатываем новые файлы
-    new_data = OUTPUT_TEMPLATE.copy()
+    new_data = {"paths": {}, "points": {}}
     for file_path in file_paths:
         result = process_shapefile(file_path)
         if result:
