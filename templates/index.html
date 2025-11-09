@@ -41,6 +41,11 @@
 </head>
 <body>
     <h1>nmaps utility</h1>
+    {% if error_message %}
+    <div id="error" class="error" style="margin-bottom: 20px;">
+        {{ error_message }}
+    </div>
+    {% endif %}
     <button onclick="document.getElementById('fileInput').click()">Выбрать ShapeFile для импорта</button>
     <input type="file" id="fileInput" multiple accept=".zip" onchange="uploadFiles()">
     <div id="status"></div>

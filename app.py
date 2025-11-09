@@ -3,7 +3,7 @@ import os
 import logging
 from yandex_disk import check_and_create_folder, download_index_json, upload_index_json
 from file_processor import process_files
-from settings import PROJECT_DIR
+from settings import PROJECT_DIR, YANDEX_DISK_API_KEY
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +20,10 @@ def init_app():
 @app.route('/')
 def index():
     """Главная страница"""
-    return render_template('index.html')
+    error_message = None
+    if YANDEX_DISK_API_KEY == "your_token_here":
+        error_message = "Добавьте ваш OAuth-токен в settings.py и перезапустите приложение."
+    return render_template('index.html', error_message=error_message)
 
 @app.route('/convert', methods=['POST'])
 def convert():

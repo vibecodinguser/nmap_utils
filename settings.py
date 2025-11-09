@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # Яндекс Диск
-YANDEX_DISK_API_KEY = "Здесь ваш токен"
+YANDEX_DISK_API_KEY = "your_token_here"
 YANDEX_DISK_API_URL = "https://cloud-api.yandex.net/v1/disk"
 BASE_FOLDER_PATH = "Приложения/Блокнот картографа Народной карты"
 DATE_FORMAT = "%Y-%m-%d"
