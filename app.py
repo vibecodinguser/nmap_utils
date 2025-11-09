@@ -1,5 +1,7 @@
 import logging
 import os
+import uuid
+import threading
 
 from flask import Flask, render_template, request, jsonify
 from settings import PROJECT_DIR, YANDEX_DISK_API_KEY
@@ -15,6 +17,10 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
 DEFAULT_TOKEN = "your_token_here"
 ERROR_MESSAGE_TOKEN = "Добавьте ваш OAuth-токен в settings.py и перезапустите приложение."
+
+# Хранилище прогресса обработки (task_id -> progress_data)
+progress_store = {}
+progress_lock = threading.Lock()
 
 
 def is_token_configured():
@@ -80,6 +86,65 @@ def index():
     return render_template('index.html', error_message=error_message)
 
 
+def process_files_with_progress(task_id, file_paths):
+    """Обрабатывает файлы с обновлением прогресса"""
+    # Распределение прогресса: 5% - скачивание, 85% - обработка файлов, 10% - загрузка
+    DOWNLOAD_START = 0
+    DOWNLOAD_END = 5
+    PROCESS_START = 5
+    PROCESS_END = 90
+    UPLOAD_START = 90
+    UPLOAD_END = 100
+    
+    def update_progress(percentage, message):
+        with progress_lock:
+            progress_store[task_id] = {
+                "current": percentage,
+                "total": 100,
+                "percentage": percentage,
+                "message": message,
+                "status": "processing"
+            }
+    
+    def process_progress_callback(current, total, message):
+        """Преобразует прогресс обработки файлов в общий прогресс"""
+        if total == 0:
+            percentage = PROCESS_END
+        else:
+            process_percentage = (current / total) * 100
+            percentage = PROCESS_START + int((process_percentage / 100) * (PROCESS_END - PROCESS_START))
+        update_progress(percentage, message)
+    
+    try:
+        update_progress(0, "Инициализация...")
+        
+        # Скачиваем актуальный index.json перед обработкой
+        update_progress(DOWNLOAD_START, "Скачивание index.json...")
+        download_index_json()
+        update_progress(DOWNLOAD_END, "Скачивание завершено")
+        
+        # Обрабатываем файлы (5% - 90%)
+        process_files(file_paths, process_progress_callback)
+        
+        # Загружаем на Яндекс Диск (90% - 100%)
+        update_progress(UPLOAD_START, "Загрузка на Яндекс Диск...")
+        if upload_index_json():
+            cleanup_files(file_paths)
+            update_progress(100, "Завершено успешно")
+            with progress_lock:
+                progress_store[task_id]["status"] = "completed"
+        else:
+            update_progress(100, "Ошибка загрузки на Яндекс Диск")
+            with progress_lock:
+                progress_store[task_id]["status"] = "error"
+    except Exception as e:
+        logger.error(f"Ошибка обработки: {e}", exc_info=True)
+        cleanup_files(file_paths)
+        update_progress(100, f"Ошибка: {str(e)}")
+        with progress_lock:
+            progress_store[task_id]["status"] = "error"
+
+
 @app.route('/convert', methods=['POST'])
 def convert():
     """Обработка загрузки и конвертации файлов"""
@@ -93,26 +158,32 @@ def convert():
     if not file_paths:
         return jsonify({"error": "Нет zip файлов"}), 400
 
-    try:
-        # Скачиваем актуальный index.json перед обработкой
-        download_index_json()
-        process_files(file_paths)
+    # Создаем task_id для отслеживания прогресса
+    task_id = str(uuid.uuid4())
+    
+    # Запускаем обработку в отдельном потоке
+    thread = threading.Thread(
+        target=process_files_with_progress,
+        args=(task_id, file_paths)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "message": "Обработка начата"
+    })
 
-        if upload_index_json():
-            cleanup_files(file_paths)
-            return jsonify({
-                "success": True,
-                "message": "Файлы обработаны и загружены на Яндекс Диск"
-            })
-        else:
-            return jsonify({
-                "error": "Ошибка загрузки файла на Яндекс Диск. Проверьте логи."
-            }), 500
 
-    except Exception as e:
-        logger.error(f"Ошибка обработки: {e}", exc_info=True)
-        cleanup_files(file_paths)  # Очистка при ошибке
-        return jsonify({"error": str(e)}), 500
+@app.route('/progress/<task_id>', methods=['GET'])
+def get_progress(task_id):
+    """Получение прогресса обработки"""
+    with progress_lock:
+        progress = progress_store.get(task_id)
+        if not progress:
+            return jsonify({"error": "Task not found"}), 404
+        return jsonify(progress)
 
 
 if __name__ == '__main__':
