@@ -4,7 +4,7 @@ import uuid
 import threading
 
 from flask import Flask, render_template, request, jsonify
-from settings import PROJECT_DIR, YANDEX_DISK_API_KEY
+from settings import PROJECT_DIR, YANDEX_DISK_API_KEY, INDEX_JSON_PATH
 from tools.file_processor import process_files
 from tools.yandex_disk import check_and_create_folder, download_index_json, upload_index_json
 
@@ -128,9 +128,17 @@ def process_files_with_progress(task_id, file_paths):
         
         # Загружаем на Яндекс Диск (90% - 100%)
         update_progress(UPLOAD_START, "Загрузка на Яндекс Диск...")
+        
+        # Получаем размер файла index.json перед загрузкой
+        file_size_mb = 0
+        if os.path.exists(INDEX_JSON_PATH):
+            file_size_bytes = os.path.getsize(INDEX_JSON_PATH)
+            file_size_mb = round(file_size_bytes / (1024 * 1024), 2)
+        
         if upload_index_json():
             cleanup_files(file_paths)
-            update_progress(100, "Завершено успешно")
+            message = f"Геометрия {file_size_mb} mb успешно выгружена!"
+            update_progress(100, message)
             with progress_lock:
                 progress_store[task_id]["status"] = "completed"
         else:

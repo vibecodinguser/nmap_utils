@@ -65,6 +65,7 @@
             padding: 12px 15px;
             border-radius: 5px;
             display: none;
+            text-align: center;
         }
 
         .message.show {
@@ -281,7 +282,6 @@
                         showProgress(100, data.message);
                         showMessage(data.message, 'success');
                         fileInput.value = '';
-                        hideFileList();
                         selectButton.disabled = false;
                         selectButton.textContent = 'Выбрать ShapeFile для импорта';
                         setTimeout(() => {
