@@ -14,8 +14,18 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
 def init_app():
     """Инициализация при запуске"""
-    check_and_create_folder()
-    download_index_json()
+    if YANDEX_DISK_API_KEY == "your_token_here":
+        logger.warning("YANDEX_DISK_API_KEY не настроен. Пропуск проверки папки на Яндекс Диске.")
+        return
+    
+    try:
+        logger.info("Проверка наличия папки на Яндекс Диске...")
+        folder_path = check_and_create_folder()
+        logger.info(f"Папка на Яндекс Диске проверена/создана: {folder_path}")
+        download_index_json()
+    except Exception as e:
+        logger.error(f"Ошибка при проверке папки на Яндекс Диске: {e}")
+        raise
 
 @app.route('/')
 def index():
