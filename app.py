@@ -5,7 +5,7 @@ import threading
 
 from flask import Flask, render_template, request, jsonify
 from settings import PROJECT_DIR, YANDEX_DISK_API_KEY, INDEX_JSON_PATH
-from tools.file_processor import process_files
+from tools.file_processor import process_files, process_gpx_files
 from tools.yandex_disk import check_and_create_folder, download_index_json, upload_index_json
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +45,18 @@ def save_uploaded_files(files):
     file_paths = []
     for file in files:
         if file.filename and file.filename.endswith('.zip'):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(file_path)
+            file_paths.append(file_path)
+            logger.info(f"Сохранен файл: {file.filename}")
+    return file_paths
+
+
+def save_uploaded_gpx_files(files):
+    """Сохраняет загруженные GPX файлы"""
+    file_paths = []
+    for file in files:
+        if file.filename and file.filename.endswith('.gpx'):
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             file_paths.append(file_path)
@@ -153,6 +165,73 @@ def process_files_with_progress(task_id, file_paths):
             progress_store[task_id]["status"] = "error"
 
 
+def process_gpx_files_with_progress(task_id, file_paths):
+    """Обрабатывает GPX файлы с обновлением прогресса"""
+    # Распределение прогресса: 5% - скачивание, 85% - обработка файлов, 10% - загрузка
+    DOWNLOAD_START = 0
+    DOWNLOAD_END = 5
+    PROCESS_START = 5
+    PROCESS_END = 90
+    UPLOAD_START = 90
+    UPLOAD_END = 100
+    
+    def update_progress(percentage, message):
+        with progress_lock:
+            progress_store[task_id] = {
+                "current": percentage,
+                "total": 100,
+                "percentage": percentage,
+                "message": message,
+                "status": "processing"
+            }
+    
+    def process_progress_callback(current, total, message):
+        """Преобразует прогресс обработки файлов в общий прогресс"""
+        if total == 0:
+            percentage = PROCESS_END
+        else:
+            process_percentage = (current / total) * 100
+            percentage = PROCESS_START + int((process_percentage / 100) * (PROCESS_END - PROCESS_START))
+        update_progress(percentage, message)
+    
+    try:
+        update_progress(0, "Инициализация...")
+        
+        # Скачиваем актуальный index.json перед обработкой
+        update_progress(DOWNLOAD_START, "Скачивание index.json...")
+        download_index_json()
+        update_progress(DOWNLOAD_END, "Скачивание завершено")
+        
+        # Обрабатываем файлы (5% - 90%)
+        process_gpx_files(file_paths, process_progress_callback)
+        
+        # Загружаем на Яндекс Диск (90% - 100%)
+        update_progress(UPLOAD_START, "Загрузка на Яндекс Диск...")
+        
+        # Получаем размер файла index.json перед загрузкой
+        file_size_mb = 0
+        if os.path.exists(INDEX_JSON_PATH):
+            file_size_bytes = os.path.getsize(INDEX_JSON_PATH)
+            file_size_mb = round(file_size_bytes / (1024 * 1024), 2)
+        
+        if upload_index_json():
+            cleanup_files(file_paths)
+            message = f"Геометрия {file_size_mb} mb успешно выгружена!"
+            update_progress(100, message)
+            with progress_lock:
+                progress_store[task_id]["status"] = "completed"
+        else:
+            update_progress(100, "Ошибка загрузки на Яндекс Диск")
+            with progress_lock:
+                progress_store[task_id]["status"] = "error"
+    except Exception as e:
+        logger.error(f"Ошибка обработки: {e}", exc_info=True)
+        cleanup_files(file_paths)
+        update_progress(100, f"Ошибка: {str(e)}")
+        with progress_lock:
+            progress_store[task_id]["status"] = "error"
+
+
 @app.route('/convert', methods=['POST'])
 def convert():
     """Обработка загрузки и конвертации файлов"""
@@ -172,6 +251,37 @@ def convert():
     # Запускаем обработку в отдельном потоке
     thread = threading.Thread(
         target=process_files_with_progress,
+        args=(task_id, file_paths)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        "success": True,
+        "task_id": task_id,
+        "message": "Обработка начата"
+    })
+
+
+@app.route('/convert_gpx', methods=['POST'])
+def convert_gpx():
+    """Обработка загрузки и конвертации GPX файлов"""
+    # Валидация файлов
+    files, error = validate_files()
+    if error:
+        return jsonify({"error": error}), 400
+
+    # Сохранение файлов
+    file_paths = save_uploaded_gpx_files(files)
+    if not file_paths:
+        return jsonify({"error": "Нет GPX файлов"}), 400
+
+    # Создаем task_id для отслеживания прогресса
+    task_id = str(uuid.uuid4())
+    
+    # Запускаем обработку в отдельном потоке
+    thread = threading.Thread(
+        target=process_gpx_files_with_progress,
         args=(task_id, file_paths)
     )
     thread.daemon = True

@@ -61,6 +61,11 @@
             width: 100%;
             font-weight: 500;
             box-shadow: 0 2px 4px rgba(0, 102, 255, 0.2);
+            margin-bottom: 12px;
+        }
+
+        button:last-of-type {
+            margin-bottom: 0;
         }
 
         button:hover:not(:disabled) {
@@ -86,6 +91,7 @@
 
         .message {
             margin-top: 20px;
+            margin-bottom: 12px;
             padding: 12px 16px;
             border-radius: 8px;
             display: none;
@@ -206,10 +212,16 @@
 {% endif %}
 
 <button id="selectButton" type="button" aria-label="Выбрать файлы для импорта">
-    Выбрать ShapeFile для импорта
+    Загрузить ShapeFile
 </button>
 
 <input type="file" id="fileInput" multiple accept=".zip" aria-label="Выбор файлов">
+
+<button id="selectGpxButton" type="button" aria-label="Выбрать GPX файлы для импорта">
+    Загрузить GPX
+</button>
+
+<input type="file" id="gpxFileInput" multiple accept=".gpx" aria-label="Выбор GPX файлов">
 
     <div id="fileList" class="file-list" role="list"></div>
 
@@ -226,18 +238,28 @@
 
         const fileInput = document.getElementById('fileInput');
         const selectButton = document.getElementById('selectButton');
+        const gpxFileInput = document.getElementById('gpxFileInput');
+        const selectGpxButton = document.getElementById('selectGpxButton');
         const fileListDiv = document.getElementById('fileList');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
 
-        // Обработчик клика по кнопке
+        // Обработчик клика по кнопке ShapeFile
         selectButton.addEventListener('click', () => {
             fileInput.click();
         });
 
-        // Обработчик выбора файлов
+        // Обработчик клика по кнопке GPX
+        selectGpxButton.addEventListener('click', () => {
+            gpxFileInput.click();
+        });
+
+        // Обработчик выбора файлов ShapeFile
         fileInput.addEventListener('change', handleFileSelect);
+
+        // Обработчик выбора файлов GPX
+        gpxFileInput.addEventListener('change', handleGpxFileSelect);
 
         function handleFileSelect(event) {
             const files = Array.from(event.target.files);
@@ -252,6 +274,21 @@
 
             // Автоматически загружаем файлы
             uploadFiles(files);
+        }
+
+        function handleGpxFileSelect(event) {
+            const files = Array.from(event.target.files);
+
+            if (files.length === 0) {
+                hideFileList();
+                return;
+            }
+
+            // Показываем список выбранных файлов
+            showFileList(files);
+
+            // Автоматически загружаем файлы
+            uploadGpxFiles(files);
         }
 
         function showFileList(files) {
@@ -297,7 +334,7 @@
             progressText.textContent = '';
         }
 
-        function pollProgress(taskId) {
+        function pollProgress(taskId, buttonElement, buttonText, fileInputElement) {
             const interval = setInterval(async () => {
                 try {
                     const response = await fetch(`/progress/${taskId}`);
@@ -307,23 +344,25 @@
                         clearInterval(interval);
                         showProgress(100, data.message);
                         showMessage(data.message, 'success');
-                        fileInput.value = '';
-                        selectButton.disabled = false;
-                        selectButton.textContent = 'Выбрать ShapeFile для импорта';
+                        if (fileInputElement) {
+                            fileInputElement.value = '';
+                        }
+                        buttonElement.disabled = false;
+                        buttonElement.textContent = buttonText;
                     } else if (data.status === 'error') {
                         clearInterval(interval);
                         showProgress(100, data.message);
                         showMessage(data.message, 'error');
-                        selectButton.disabled = false;
-                        selectButton.textContent = 'Выбрать ShapeFile для импорта';
+                        buttonElement.disabled = false;
+                        buttonElement.textContent = buttonText;
                     } else {
                         showProgress(data.percentage, data.message);
                     }
                 } catch (error) {
                     clearInterval(interval);
                     showMessage(`Ошибка получения прогресса: ${error.message}`, 'error');
-                    selectButton.disabled = false;
-                    selectButton.textContent = 'Выбрать ShapeFile для импорта';
+                    buttonElement.disabled = false;
+                    buttonElement.textContent = buttonText;
                     hideProgress();
                 }
             }, 500); // Опрашиваем каждые 500мс
@@ -360,17 +399,63 @@
 
                 if (data.success && data.task_id) {
                     // Начинаем опрос прогресса
-                    pollProgress(data.task_id);
+                    pollProgress(data.task_id, selectButton, 'Загрузить ShapeFile', fileInput);
                 } else {
                     showMessage(data.error || 'Произошла ошибка', 'error');
                     selectButton.disabled = false;
-                    selectButton.textContent = 'Выбрать ShapeFile для импорта';
+                    selectButton.textContent = 'Загрузить ShapeFile';
                     hideProgress();
                 }
             } catch (error) {
                 showMessage(`Ошибка: ${error.message || 'Неизвестная ошибка'}`, 'error');
                 selectButton.disabled = false;
-                selectButton.textContent = 'Выбрать ShapeFile для импорта';
+                selectButton.textContent = 'Загрузить ShapeFile';
+                hideProgress();
+            }
+        }
+
+        async function uploadGpxFiles(files) {
+            if (files.length === 0) return;
+
+            // Валидация файлов на клиенте
+            const invalidFiles = files.filter(file => !file.name.endsWith('.gpx'));
+            if (invalidFiles.length > 0) {
+                showMessage('Пожалуйста, выберите только GPX файлы', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Блокируем кнопку и показываем статус
+            selectGpxButton.disabled = true;
+            selectGpxButton.innerHTML = '<span class="spinner"></span>Обработка...';
+            hideMessage();
+            showProgress(0, 'Инициализация...');
+
+            try {
+                const response = await fetch('/convert_gpx', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.task_id) {
+                    // Начинаем опрос прогресса
+                    pollProgress(data.task_id, selectGpxButton, 'Загрузить GPX', gpxFileInput);
+                } else {
+                    showMessage(data.error || 'Произошла ошибка', 'error');
+                    selectGpxButton.disabled = false;
+                    selectGpxButton.textContent = 'Загрузить GPX';
+                    hideProgress();
+                }
+            } catch (error) {
+                showMessage(`Ошибка: ${error.message || 'Неизвестная ошибка'}`, 'error');
+                selectGpxButton.disabled = false;
+                selectGpxButton.textContent = 'Загрузить GPX';
                 hideProgress();
             }
         }
