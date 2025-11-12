@@ -1,0 +1,165 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "YS Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f8f8f8;
+    color: #000;
+    line-height: 1.5;
+    padding: 0;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    min-height: 100vh;
+    padding: 32px;
+}
+
+h1 {
+    color: #000;
+    margin-top: 48px;
+    margin-bottom: 32px;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 28px;
+    text-align: center;
+}
+
+h2 {
+    color: #000;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 22px;
+    margin-bottom: 16px;
+}
+
+h3 {
+    color: #000;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 20px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.warning-section {
+    background: #fff9e6;
+    border: 1px solid #ffd700;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.warning-section h2 {
+    color: #856404;
+    margin-bottom: 8px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.warning-section p {
+    color: #856404;
+    font-size: 14px;
+    margin: 0;
+    line-height: 20px;
+}
+
+.upload-section {
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.upload-button {
+    background: #0066ff;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    font-family: inherit;
+    line-height: 20px;
+}
+
+.upload-button:hover:not(:disabled) {
+    background: #0052cc;
+}
+
+.upload-button:active:not(:disabled) {
+    background: #003d99;
+}
+
+.upload-button:disabled {
+    background: #d9d9d9;
+    color: #999;
+    cursor: not-allowed;
+}
+
+.results-section {
+    margin-top: 32px;
+}
+
+.files-list {
+    margin-bottom: 24px;
+}
+
+.files-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.files-list li {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 20px;
+    border: 1px solid #e6e6e6;
+}
+
+.files-list h3:first-of-type + ul li {
+    border-left: 3px solid #00c853;
+    border-left-color: #00c853;
+}
+
+.files-list h3:last-of-type + ul li {
+    border-left: 3px solid #ff5252;
+    border-left-color: #ff5252;
+}
+
+.loading {
+    text-align: center;
+    padding: 48px 20px;
+}
+
+.spinner {
+    border: 3px solid #e6e6e6;
+    border-top: 3px solid #0066ff;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading p {
+    color: #666;
+    font-size: 14px;
+    line-height: 20px;
+}

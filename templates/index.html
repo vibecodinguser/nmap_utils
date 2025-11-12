@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nmap_utils</title>
+    <link rel="icon" type="image/svg+xml" href="https://n.maps.yandex.ru/favicon-dot.svg">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>NMAP_UTILS</h1>
+        
+        {% if not token_configured %}
+        <div class="warning-section">
+            <h2>ВНИМАНИЕ</h2>
+            <p>Получите OAuth-токен, вставьте его в config.py и перезапустите приложение</p>
+        </div>
+        {% endif %}
+        
+        <div class="upload-section">
+            <input type="file" id="fileInput" multiple accept=".zip" style="display: none;">
+            <button id="uploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить SHP</button>
+        </div>
+        
+        <div id="results" class="results-section" style="display: none;">
+            <div id="processedFiles" class="files-list"></div>
+            <div id="failedFiles" class="files-list"></div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Обработка файлов...</p>
+        </div>
+    </div>
+    
+    <script>
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const processedFiles = document.getElementById('processedFiles');
+        const failedFiles = document.getElementById('failedFiles');
+        
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (files.length === 0) return;
+            
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+            
+            // Показываем загрузку
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            uploadBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Проверяем статус ответа
+                if (!response.ok) {
+                    let errorText = `Ошибка сервера (${response.status}): `;
+                    try {
+                        const errorData = await response.json();
+                        errorText += errorData.error || response.statusText;
+                    } catch (e) {
+                        errorText += response.statusText;
+                    }
+                    alert(errorText);
+                    loading.style.display = 'none';
+                    uploadBtn.disabled = false;
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Ошибка: ' + data.error);
+                    loading.style.display = 'none';
+                    uploadBtn.disabled = false;
+                    return;
+                }
+                
+                // Отображаем результаты
+                if (data.processed && data.processed.length > 0) {
+                    processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
+                        data.processed.map(f => `<li>${f.name} (${f.size})</li>`).join('') +
+                        '</ul>';
+                } else {
+                    processedFiles.innerHTML = '';
+                }
+                
+                if (data.failed && data.failed.length > 0) {
+                    failedFiles.innerHTML = '<h3>Пропущено:</h3><ul>' +
+                        data.failed.map(f => `<li>${f.name} (${f.size}): ${f.error || 'Неизвестная ошибка'}</li>`).join('') +
+                        '</ul>';
+                } else {
+                    failedFiles.innerHTML = '';
+                }
+                
+                results.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                alert('Ошибка загрузки: ' + (error.message || 'Неизвестная ошибка'));
+            } finally {
+                loading.style.display = 'none';
+                uploadBtn.disabled = false;
+                fileInput.value = '';
+            }
+        });
+    </script>
+</body>
+</html>
+
