@@ -8,12 +8,19 @@ from shapely.geometry import LineString, Point, Polygon, MultiPolygon
 def process_shapefile(zip_path):
     """Обрабатывает shapefile из zip-архива и возвращает словарь с paths и points"""
     output = {"paths": {}, "points": {}}
+    titles = set()  # Собираем уникальные значения title
+    categories = set()  # Собираем уникальные значения category_t
     
     try:
         # Читаем shapefile напрямую из zip
         gdf = gpd.read_file(f"zip://{zip_path}", encoding="utf-8")
         
         for idx, row in gdf.iterrows():
+            # Собираем значения category_t и title
+            if "category_t" in row and pd.notna(row["category_t"]):
+                categories.add(str(row["category_t"]).strip())
+            if "title" in row and pd.notna(row["title"]):
+                titles.add(str(row["title"]).strip())
             geom = row.geometry
             
             # Пропускаем пустые геометрии
@@ -39,6 +46,12 @@ def process_shapefile(zip_path):
                 for line in geom.geoms:
                     if not line.is_empty:
                         _process_linestring(line, output, row)
+        
+        # Добавляем информацию о category_t и title в результат
+        if categories:
+            output["category_t"] = ", ".join(sorted(categories))
+        if titles:
+            output["title"] = ", ".join(sorted(titles))
         
         return output
     

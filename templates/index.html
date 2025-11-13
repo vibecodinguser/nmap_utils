@@ -6,6 +6,23 @@
     <title>nmap_utils</title>
     <link rel="icon" type="image/svg+xml" href="https://n.maps.yandex.ru/favicon-dot.svg">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <style>
+        @font-face {
+            font-family: "YS Text";
+            font-style: normal;
+            font-weight: 400;
+            src: local("YS Text Regular"), local("YS-Text-Regular"),
+                 url("https://yastatic.net/s3/home/fonts/ys/1/text-regular.woff2") format("woff2");
+        }
+        @font-face {
+            font-family: "YS Text";
+            font-style: normal;
+            font-weight: 500;
+            src: local("YS Text Medium"), local("YS-Text-Medium"),
+                 url("https://yastatic.net/s3/home/fonts/ys/1/text-medium.woff2") format("woff2");
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -93,7 +110,13 @@
                 // Отображаем результаты
                 if (data.processed && data.processed.length > 0) {
                     processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
-                        data.processed.map(f => `<li>${f.name} (${f.size})</li>`).join('') +
+                        data.processed.map(f => {
+                            const parts = [];
+                            if (f.category_t) parts.push(f.category_t);
+                            if (f.title) parts.push(f.title);
+                            const infoPart = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
+                            return `<li>${f.name}${infoPart} (${f.size})</li>`;
+                        }).join('') +
                         '</ul>';
                 } else {
                     processedFiles.innerHTML = '';
