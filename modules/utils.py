@@ -54,7 +54,6 @@ def load_index_json():
                 return data
         except (json.JSONDecodeError, IOError, TypeError, ValueError) as e:
             # Если ошибка при чтении или парсинге, возвращаем пустой шаблон
-            print(f"Предупреждение: ошибка при чтении index.json: {str(e)}")
             pass
     
     # Если файла нет или ошибка чтения, возвращаем пустой шаблон
