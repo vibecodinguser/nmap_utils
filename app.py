@@ -12,7 +12,8 @@ from config import YANDEX_DISK_API_KEY
 from modules.yandex_disk import ensure_folder_exists, download_index_json, upload_index_json
 from modules.shapefile_processing import process_shapefile
 from modules.geojson_processing import process_geojson
-from modules.utils import allowed_file, allowed_geojson_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
+from modules.gpx_processing import process_gpx
+from modules.utils import allowed_file, allowed_geojson_file, allowed_gpx_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "./data/uploads"
@@ -465,6 +466,209 @@ def process_geojson_thread(session_id, files_data):
         })
 
 
+def process_gpx_thread(session_id, files_data):
+    """Обрабатывает GPX файлы в отдельном потоке с отслеживанием прогресса"""
+    start_time = datetime.now()
+    processed_files = []
+    failed_files = []
+    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
+    total_steps = 3 + len(files_data) + 2
+    current_step = 0
+    
+    try:
+        with session_lock:
+            processing_sessions[session_id] = {
+                "status": "processing",
+                "total": total_steps,
+                "current": 0,
+                "percentage": 0,
+                "current_stage": "Инициализация...",
+                "file_progress": {},
+                "processed": [],
+                "failed": [],
+                "error": None
+            }
+        
+        # Этап 1: Проверка/создание папки на Яндекс.Диске
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
+        })
+        step_start = datetime.now()
+        logger.info("Проверка/создание папки на Яндекс.Диске...")
+        folder_path = ensure_folder_exists()
+        step_time = (datetime.now() - step_start).total_seconds()
+        logger.info(f"Папка на Яндекс.Диске: {folder_path} (заняло {step_time:.2f} сек)")
+
+        # Этап 2: Скачивание существующего index.json
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Скачивание существующего index.json..."
+        })
+        step_start = datetime.now()
+        logger.info("Попытка скачать существующий index.json...")
+        download_index_json(folder_path)
+        step_time = (datetime.now() - step_start).total_seconds()
+        logger.info(f"Скачивание index.json завершено (заняло {step_time:.2f} сек)")
+
+        # Этап 3: Загрузка существующих данных
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Загрузка существующих данных..."
+        })
+        step_start = datetime.now()
+        accumulated_data = load_index_json()
+        step_time = (datetime.now() - step_start).total_seconds()
+        logger.info(f"Загружено существующих данных: paths={len(accumulated_data.get('paths', {}))}, points={len(accumulated_data.get('points', {}))} (заняло {step_time:.3f} сек)")
+
+        # Этап 4: Обработка каждого файла
+        for idx, file_info in enumerate(files_data, 1):
+            filename = file_info["filename"]
+            file_path = file_info["file_path"]
+            
+            current_step += 1
+            
+            with session_lock:
+                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                current_file_progress[filename] = {"status": "processing", "progress": 0}
+            
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
+                "file_progress": current_file_progress
+            })
+            
+            logger.info(f"Обработка файла {idx}/{len(files_data)}: {filename}")
+
+            try:
+                # Обрабатываем GPX
+                step_start = datetime.now()
+                logger.info(f"Начало обработки GPX: {filename}")
+                result = process_gpx(file_path)
+                step_time = (datetime.now() - step_start).total_seconds()
+                paths_count = len(result.get("paths", {}))
+                points_count = len(result.get("points", {}))
+                logger.info(f"GPX обработан успешно: paths={paths_count}, points={points_count} (заняло {step_time:.2f} сек)")
+
+                # Извлекаем category_t и title из результата перед объединением
+                file_category = result.pop("category_t", "")
+                file_title = result.pop("title", "")
+                
+                # Объединяем с накопленными данными
+                step_start = datetime.now()
+                accumulated_data = merge_data(accumulated_data, result)
+                step_time = (datetime.now() - step_start).total_seconds()
+                logger.debug(f"Объединение данных завершено (заняло {step_time:.3f} сек)")
+                
+                processed_files.append({
+                    "name": filename,
+                    "size": format_file_size(os.path.getsize(file_path)),
+                    "category_t": file_category,
+                    "title": file_title
+                })
+                
+                with session_lock:
+                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                    current_file_progress[filename] = {"status": "completed", "progress": 100}
+                
+                update_progress(session_id, {
+                    "file_progress": current_file_progress
+                })
+                
+                info_parts = []
+                if file_category:
+                    info_parts.append(f"category_t: {file_category}")
+                if file_title:
+                    info_parts.append(f"title: {file_title}")
+                logger.info(f"Файл успешно обработан: {filename}" + (f" ({', '.join(info_parts)})" if info_parts else ""))
+
+            except Exception as e:
+                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
+                failed_files.append({
+                    "name": filename,
+                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
+                    "error": str(e)
+                })
+                with session_lock:
+                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
+                
+                update_progress(session_id, {
+                    "file_progress": current_file_progress
+                })
+            finally:
+                # Удаляем временный файл
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.debug(f"Временный файл удалён: {file_path}")
+
+        # Этап 5: Сохранение финального index.json
+        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
+            current_step += 1
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": "Сохранение финального index.json..."
+            })
+            step_start = datetime.now()
+            logger.info("Сохранение финального index.json...")
+            local_index_path = save_index_json(accumulated_data)
+            step_time = (datetime.now() - step_start).total_seconds()
+            final_paths = len(accumulated_data.get("paths", {}))
+            final_points = len(accumulated_data.get("points", {}))
+            logger.info(f"Финальные данные сохранены: paths={final_paths}, points={final_points} (заняло {step_time:.2f} сек)")
+
+            # Этап 6: Загрузка на Яндекс.Диск
+            current_step += 1
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": "Загрузка index.json на Яндекс.Диск..."
+            })
+            try:
+                step_start = datetime.now()
+                logger.info("Загрузка index.json на Яндекс.Диск...")
+                upload_index_json(folder_path, local_index_path)
+                step_time = (datetime.now() - step_start).total_seconds()
+                logger.info(f"index.json успешно загружен на Яндекс.Диск (заняло {step_time:.2f} сек)")
+                # Удаляем локальный файл после успешной загрузки
+                if os.path.exists(local_index_path):
+                    os.remove(local_index_path)
+                    logger.debug("Локальный index.json удалён после успешной загрузки")
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}", exc_info=True)
+
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
+        
+        update_progress(session_id, {
+            "status": "completed",
+            "current": total_steps,
+            "percentage": 100,
+            "current_stage": "Обработка завершена",
+            "processed": processed_files,
+            "failed": failed_files
+        })
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        logger.error(f"Критическая ошибка обработки за {elapsed_time:.2f} сек: {str(e)}\n{error_details}", exc_info=True)
+        update_progress(session_id, {
+            "status": "error",
+            "error": str(e),
+            "current_stage": f"Ошибка: {str(e)}"
+        })
+
+
 @app.route("/upload", methods=["POST"])
 def upload_files():
     """Обработка загрузки файлов - сохраняет файлы и запускает обработку"""
@@ -575,6 +779,64 @@ def upload_geojson_files():
     
     # Запускаем обработку в отдельном потоке
     thread = threading.Thread(target=process_geojson_thread, args=(session_id, files_data))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"session_id": session_id})
+
+
+@app.route("/upload-gpx", methods=["POST"])
+def upload_gpx_files():
+    """Обработка загрузки GPX файлов - сохраняет файлы и запускает обработку"""
+    logger.info(f"POST /upload-gpx - Начало загрузки GPX файлов с IP: {request.remote_addr}")
+    
+    if not is_token_configured():
+        logger.warning("Попытка загрузки без настроенного OAuth токена")
+        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
+
+    if "files" not in request.files:
+        logger.warning("Запрос без файлов")
+        return jsonify({"error": "Файлы не найдены"}), 400
+
+    files = request.files.getlist("files")
+
+    if not files or files[0].filename == "":
+        logger.warning("Файлы не выбраны")
+        return jsonify({"error": "Файлы не выбраны"}), 400
+
+    logger.info(f"Получено GPX файлов для обработки: {len(files)}")
+    
+    # Создаём session_id
+    session_id = str(uuid.uuid4())
+    files_data = []
+    
+    # Сохраняем файлы
+    for file in files:
+        if not allowed_gpx_file(file.filename):
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            logger.warning(f"Файл отклонён (недопустимое расширение): {file.filename}")
+            continue
+
+        if not check_file_size(file):
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            logger.warning(f"Файл отклонён (слишком большой): {file.filename} ({format_file_size(file_size)})")
+            continue
+            
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
+        file.save(file_path)
+        logger.debug(f"Файл сохранён во временную директорию: {file_path}")
+        files_data.append({"filename": filename, "file_path": file_path})
+    
+    if not files_data:
+        return jsonify({"error": "Нет валидных GPX файлов для обработки"}), 400
+    
+    # Запускаем обработку в отдельном потоке
+    thread = threading.Thread(target=process_gpx_thread, args=(session_id, files_data))
     thread.daemon = True
     thread.start()
     

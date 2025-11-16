@@ -42,6 +42,8 @@
             <button id="uploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить ShapeFile</button>
             <input type="file" id="geojsonInput" multiple accept=".geojson,.json" style="display: none;">
             <button id="geojsonUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить GeoJSON</button>
+            <input type="file" id="gpxInput" multiple accept=".gpx" style="display: none;">
+            <button id="gpxUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить GPX</button>
         </div>
         
         <div id="results" class="results-section" style="display: none;">
@@ -73,6 +75,8 @@
         const fileInput = document.getElementById('fileInput');
         const geojsonUploadBtn = document.getElementById('geojsonUploadBtn');
         const geojsonInput = document.getElementById('geojsonInput');
+        const gpxUploadBtn = document.getElementById('gpxUploadBtn');
+        const gpxInput = document.getElementById('gpxInput');
         const results = document.getElementById('results');
         const loading = document.getElementById('loading');
         const processedFiles = document.getElementById('processedFiles');
@@ -84,6 +88,10 @@
         
         geojsonUploadBtn.addEventListener('click', () => {
             geojsonInput.click();
+        });
+        
+        gpxUploadBtn.addEventListener('click', () => {
+            gpxInput.click();
         });
         
         function setupFileUpload(inputElement, uploadEndpoint, buttonElement) {
@@ -101,6 +109,7 @@
                 results.style.display = 'none';
                 uploadBtn.disabled = true;
                 geojsonUploadBtn.disabled = true;
+                gpxUploadBtn.disabled = true;
                 
                 // Сбрасываем прогресс
                 document.getElementById('currentStage').textContent = 'Загрузка файлов...';
@@ -130,6 +139,7 @@
                         loading.style.display = 'none';
                         uploadBtn.disabled = false;
                         geojsonUploadBtn.disabled = false;
+                        gpxUploadBtn.disabled = false;
                         return;
                     }
                     
@@ -140,6 +150,7 @@
                         loading.style.display = 'none';
                         uploadBtn.disabled = false;
                         geojsonUploadBtn.disabled = false;
+                        gpxUploadBtn.disabled = false;
                         return;
                     }
                     
@@ -218,8 +229,10 @@
                             loading.style.display = 'none';
                             uploadBtn.disabled = false;
                             geojsonUploadBtn.disabled = false;
+                            gpxUploadBtn.disabled = false;
                             fileInput.value = '';
                             geojsonInput.value = '';
+                            gpxInput.value = '';
                         }
                         
                         // Если произошла ошибка
@@ -229,8 +242,10 @@
                             loading.style.display = 'none';
                             uploadBtn.disabled = false;
                             geojsonUploadBtn.disabled = false;
+                            gpxUploadBtn.disabled = false;
                             fileInput.value = '';
                             geojsonInput.value = '';
+                            gpxInput.value = '';
                         }
                     });
                     
@@ -243,6 +258,7 @@
                         loading.style.display = 'none';
                         uploadBtn.disabled = false;
                         geojsonUploadBtn.disabled = false;
+                        gpxUploadBtn.disabled = false;
                     };
                     
                 } catch (error) {
@@ -254,8 +270,10 @@
                     loading.style.display = 'none';
                     uploadBtn.disabled = false;
                     geojsonUploadBtn.disabled = false;
+                    gpxUploadBtn.disabled = false;
                     fileInput.value = '';
                     geojsonInput.value = '';
+                    gpxInput.value = '';
                 }
             });
         }
@@ -265,6 +283,9 @@
         
         // Настраиваем загрузку для GeoJSON файлов
         setupFileUpload(geojsonInput, '/upload-geojson', geojsonUploadBtn);
+        
+        // Настраиваем загрузку для GPX файлов
+        setupFileUpload(gpxInput, '/upload-gpx', gpxUploadBtn);
     </script>
 </body>
 </html>
