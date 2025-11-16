@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from tqdm import tqdm
 from config import YANDEX_DISK_API_KEY
 from modules.yandex_disk import ensure_folder_exists, download_index_json, upload_index_json
-from modules.geometry_processing import process_shapefile
+from modules.shapefile_processing import process_shapefile
 from modules.geojson_processing import process_geojson
 from modules.utils import allowed_file, allowed_geojson_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
 
