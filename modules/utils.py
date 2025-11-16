@@ -4,12 +4,18 @@ import json
 
 LOCAL_DATA_FOLDER = "./data"
 ALLOWED_EXTENSIONS = {"zip"}
+ALLOWED_GEOJSON_EXTENSIONS = {"geojson", "json"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 def allowed_file(filename):
     """Проверяет, разрешено ли расширение файла"""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def allowed_geojson_file(filename):
+    """Проверяет, разрешено ли расширение файла для GeoJSON"""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_GEOJSON_EXTENSIONS
 
 
 def check_file_size(file):

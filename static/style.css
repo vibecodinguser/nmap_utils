@@ -17,7 +17,7 @@ body {
 
 .container {
     max-width: 960px;
-    margin: 0 auto;
+    margin: 100px auto 0;
     background: #fff;
     min-height: 100vh;
     padding: 40px 32px;
@@ -105,6 +105,10 @@ h3 {
 .upload-section {
     margin-bottom: 40px;
     text-align: center;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
 .upload-button {
@@ -122,6 +126,8 @@ h3 {
     box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
     position: relative;
     overflow: hidden;
+    min-width: 200px;
+    white-space: nowrap;
 }
 
 .upload-button::before {

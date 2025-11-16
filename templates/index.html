@@ -39,7 +39,9 @@
         
         <div class="upload-section">
             <input type="file" id="fileInput" multiple accept=".zip" style="display: none;">
-            <button id="uploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить SHP</button>
+            <button id="uploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить ShapeFile</button>
+            <input type="file" id="geojsonInput" multiple accept=".geojson,.json" style="display: none;">
+            <button id="geojsonUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить GeoJSON</button>
         </div>
         
         <div id="results" class="results-section" style="display: none;">
@@ -69,6 +71,8 @@
     <script>
         const uploadBtn = document.getElementById('uploadBtn');
         const fileInput = document.getElementById('fileInput');
+        const geojsonUploadBtn = document.getElementById('geojsonUploadBtn');
+        const geojsonInput = document.getElementById('geojsonInput');
         const results = document.getElementById('results');
         const loading = document.getElementById('loading');
         const processedFiles = document.getElementById('processedFiles');
@@ -78,167 +82,189 @@
             fileInput.click();
         });
         
-        fileInput.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            if (files.length === 0) return;
-            
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files', file);
-            }
-            
-            // Показываем загрузку
-            loading.style.display = 'block';
-            results.style.display = 'none';
-            uploadBtn.disabled = true;
-            
-            // Сбрасываем прогресс
-            document.getElementById('currentStage').textContent = 'Загрузка файлов...';
-            document.getElementById('progressPercentage').textContent = '0%';
-            document.getElementById('progressCounter').textContent = '0/0';
-            document.getElementById('mainProgressFill').style.width = '0%';
-            document.getElementById('fileProgressList').innerHTML = '';
-            
-            let eventSource = null;
-            
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+        geojsonUploadBtn.addEventListener('click', () => {
+            geojsonInput.click();
+        });
+        
+        function setupFileUpload(inputElement, uploadEndpoint, buttonElement) {
+            inputElement.addEventListener('change', async (e) => {
+                const files = e.target.files;
+                if (files.length === 0) return;
                 
-                // Проверяем статус ответа
-                if (!response.ok) {
-                    let errorText = `Ошибка сервера (${response.status}): `;
-                    try {
-                        const errorData = await response.json();
-                        errorText += errorData.error || response.statusText;
-                    } catch (e) {
-                        errorText += response.statusText;
-                    }
-                    alert(errorText);
-                    loading.style.display = 'none';
-                    uploadBtn.disabled = false;
-                    return;
+                const formData = new FormData();
+                for (let file of files) {
+                    formData.append('files', file);
                 }
                 
-                const data = await response.json();
+                // Показываем загрузку
+                loading.style.display = 'block';
+                results.style.display = 'none';
+                uploadBtn.disabled = true;
+                geojsonUploadBtn.disabled = true;
                 
-                if (data.error) {
-                    alert('Ошибка: ' + data.error);
-                    loading.style.display = 'none';
-                    uploadBtn.disabled = false;
-                    return;
-                }
+                // Сбрасываем прогресс
+                document.getElementById('currentStage').textContent = 'Загрузка файлов...';
+                document.getElementById('progressPercentage').textContent = '0%';
+                document.getElementById('progressCounter').textContent = '0/0';
+                document.getElementById('mainProgressFill').style.width = '0%';
+                document.getElementById('fileProgressList').innerHTML = '';
                 
-                // Подключаемся к SSE потоку
-                const sessionId = data.session_id;
-                eventSource = new EventSource(`/progress/${sessionId}`);
+                let eventSource = null;
                 
-                eventSource.addEventListener('progress', (e) => {
-                    const progressData = JSON.parse(e.data);
+                try {
+                    const response = await fetch(uploadEndpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
                     
-                    // Обновляем общий прогресс
-                    if (progressData.current_stage) {
-                        document.getElementById('currentStage').textContent = progressData.current_stage;
-                    }
-                    
-                    if (progressData.percentage !== undefined) {
-                        document.getElementById('progressPercentage').textContent = `${progressData.percentage}%`;
-                        document.getElementById('mainProgressFill').style.width = `${progressData.percentage}%`;
-                    }
-                    
-                    if (progressData.current !== undefined && progressData.total !== undefined) {
-                        document.getElementById('progressCounter').textContent = `${progressData.current}/${progressData.total}`;
-                    }
-                    
-                    // Обновляем прогресс по файлам
-                    if (progressData.file_progress) {
-                        const fileProgressList = document.getElementById('fileProgressList');
-                        fileProgressList.innerHTML = '';
-                        
-                        Object.entries(progressData.file_progress).forEach(([filename, fileData]) => {
-                            const fileDiv = document.createElement('div');
-                            fileDiv.className = 'file-progress-item';
-                            
-                            const statusClass = fileData.status === 'completed' ? 'completed' : 
-                                              fileData.status === 'failed' ? 'failed' : 'processing';
-                            
-                            fileDiv.innerHTML = `
-                                <div class="file-progress-name ${statusClass}">${filename}</div>
-                                <div class="file-progress-bar">
-                                    <div class="file-progress-fill ${statusClass}" style="width: ${fileData.progress || 0}%"></div>
-                                </div>
-                                ${fileData.error ? `<div class="file-progress-error">${fileData.error}</div>` : ''}
-                            `;
-                            fileProgressList.appendChild(fileDiv);
-                        });
-                    }
-                    
-                    // Если обработка завершена
-                    if (progressData.status === 'completed') {
-                        eventSource.close();
-                        
-                        // Отображаем результаты
-                        if (progressData.processed && progressData.processed.length > 0) {
-                            processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
-                                progressData.processed.map(f => {
-                                    const parts = [];
-                                    if (f.category_t) parts.push(f.category_t);
-                                    if (f.title) parts.push(f.title);
-                                    const infoPart = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
-                                    return `<li>${f.name}${infoPart} (${f.size})</li>`;
-                                }).join('') +
-                                '</ul>';
-                        } else {
-                            processedFiles.innerHTML = '';
+                    // Проверяем статус ответа
+                    if (!response.ok) {
+                        let errorText = `Ошибка сервера (${response.status}): `;
+                        try {
+                            const errorData = await response.json();
+                            errorText += errorData.error || response.statusText;
+                        } catch (e) {
+                            errorText += response.statusText;
                         }
-                        
-                        if (progressData.failed && progressData.failed.length > 0) {
-                            failedFiles.innerHTML = '<h3>Пропущено:</h3><ul>' +
-                                progressData.failed.map(f => `<li>${f.name} (${f.size}): ${f.error || 'Неизвестная ошибка'}</li>`).join('') +
-                                '</ul>';
-                        } else {
-                            failedFiles.innerHTML = '';
-                        }
-                        
-                        results.style.display = 'block';
+                        alert(errorText);
                         loading.style.display = 'none';
                         uploadBtn.disabled = false;
-                        fileInput.value = '';
+                        geojsonUploadBtn.disabled = false;
+                        return;
                     }
                     
-                    // Если произошла ошибка
-                    if (progressData.status === 'error') {
-                        eventSource.close();
-                        alert('Ошибка обработки: ' + (progressData.error || 'Неизвестная ошибка'));
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        alert('Ошибка: ' + data.error);
                         loading.style.display = 'none';
                         uploadBtn.disabled = false;
-                        fileInput.value = '';
+                        geojsonUploadBtn.disabled = false;
+                        return;
                     }
-                });
-                
-                eventSource.onerror = (error) => {
-                    console.error('Ошибка SSE:', error);
+                    
+                    // Подключаемся к SSE потоку
+                    const sessionId = data.session_id;
+                    eventSource = new EventSource(`/progress/${sessionId}`);
+                    
+                    eventSource.addEventListener('progress', (e) => {
+                        const progressData = JSON.parse(e.data);
+                        
+                        // Обновляем общий прогресс
+                        if (progressData.current_stage) {
+                            document.getElementById('currentStage').textContent = progressData.current_stage;
+                        }
+                        
+                        if (progressData.percentage !== undefined) {
+                            document.getElementById('progressPercentage').textContent = `${progressData.percentage}%`;
+                            document.getElementById('mainProgressFill').style.width = `${progressData.percentage}%`;
+                        }
+                        
+                        if (progressData.current !== undefined && progressData.total !== undefined) {
+                            document.getElementById('progressCounter').textContent = `${progressData.current}/${progressData.total}`;
+                        }
+                        
+                        // Обновляем прогресс по файлам
+                        if (progressData.file_progress) {
+                            const fileProgressList = document.getElementById('fileProgressList');
+                            fileProgressList.innerHTML = '';
+                            
+                            Object.entries(progressData.file_progress).forEach(([filename, fileData]) => {
+                                const fileDiv = document.createElement('div');
+                                fileDiv.className = 'file-progress-item';
+                                
+                                const statusClass = fileData.status === 'completed' ? 'completed' : 
+                                                  fileData.status === 'failed' ? 'failed' : 'processing';
+                                
+                                fileDiv.innerHTML = `
+                                    <div class="file-progress-name ${statusClass}">${filename}</div>
+                                    <div class="file-progress-bar">
+                                        <div class="file-progress-fill ${statusClass}" style="width: ${fileData.progress || 0}%"></div>
+                                    </div>
+                                    ${fileData.error ? `<div class="file-progress-error">${fileData.error}</div>` : ''}
+                                `;
+                                fileProgressList.appendChild(fileDiv);
+                            });
+                        }
+                        
+                        // Если обработка завершена
+                        if (progressData.status === 'completed') {
+                            eventSource.close();
+                            
+                            // Отображаем результаты
+                            if (progressData.processed && progressData.processed.length > 0) {
+                                processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
+                                    progressData.processed.map(f => {
+                                        const parts = [];
+                                        if (f.category_t) parts.push(f.category_t);
+                                        if (f.title) parts.push(f.title);
+                                        const infoPart = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
+                                        return `<li>${f.name}${infoPart} (${f.size})</li>`;
+                                    }).join('') +
+                                    '</ul>';
+                            } else {
+                                processedFiles.innerHTML = '';
+                            }
+                            
+                            if (progressData.failed && progressData.failed.length > 0) {
+                                failedFiles.innerHTML = '<h3>Пропущено:</h3><ul>' +
+                                    progressData.failed.map(f => `<li>${f.name} (${f.size}): ${f.error || 'Неизвестная ошибка'}</li>`).join('') +
+                                    '</ul>';
+                            } else {
+                                failedFiles.innerHTML = '';
+                            }
+                            
+                            results.style.display = 'block';
+                            loading.style.display = 'none';
+                            uploadBtn.disabled = false;
+                            geojsonUploadBtn.disabled = false;
+                            fileInput.value = '';
+                            geojsonInput.value = '';
+                        }
+                        
+                        // Если произошла ошибка
+                        if (progressData.status === 'error') {
+                            eventSource.close();
+                            alert('Ошибка обработки: ' + (progressData.error || 'Неизвестная ошибка'));
+                            loading.style.display = 'none';
+                            uploadBtn.disabled = false;
+                            geojsonUploadBtn.disabled = false;
+                            fileInput.value = '';
+                            geojsonInput.value = '';
+                        }
+                    });
+                    
+                    eventSource.onerror = (error) => {
+                        console.error('Ошибка SSE:', error);
+                        if (eventSource) {
+                            eventSource.close();
+                        }
+                        alert('Ошибка подключения к потоку прогресса');
+                        loading.style.display = 'none';
+                        uploadBtn.disabled = false;
+                        geojsonUploadBtn.disabled = false;
+                    };
+                    
+                } catch (error) {
+                    console.error('Ошибка загрузки:', error);
                     if (eventSource) {
                         eventSource.close();
                     }
-                    alert('Ошибка подключения к потоку прогресса');
+                    alert('Ошибка загрузки: ' + (error.message || 'Неизвестная ошибка'));
                     loading.style.display = 'none';
                     uploadBtn.disabled = false;
-                };
-                
-            } catch (error) {
-                console.error('Ошибка загрузки:', error);
-                if (eventSource) {
-                    eventSource.close();
+                    geojsonUploadBtn.disabled = false;
+                    fileInput.value = '';
+                    geojsonInput.value = '';
                 }
-                alert('Ошибка загрузки: ' + (error.message || 'Неизвестная ошибка'));
-                loading.style.display = 'none';
-                uploadBtn.disabled = false;
-                fileInput.value = '';
-            }
-        });
+            });
+        }
+        
+        // Настраиваем загрузку для SHP файлов
+        setupFileUpload(fileInput, '/upload', uploadBtn);
+        
+        // Настраиваем загрузку для GeoJSON файлов
+        setupFileUpload(geojsonInput, '/upload-geojson', geojsonUploadBtn);
     </script>
 </body>
 </html>
