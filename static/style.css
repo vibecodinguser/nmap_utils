@@ -35,6 +35,32 @@ h1 {
     letter-spacing: -0.3px;
 }
 
+.logo-link {
+    display: block;
+    text-align: center;
+    margin: 0 auto 40px;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+    color: inherit;
+}
+
+.logo-link:hover {
+    opacity: 0.8;
+}
+
+.logo-link:visited {
+    color: inherit;
+}
+
+.logo-svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+    cursor: pointer;
+    color: #000;
+}
+
 h2 {
     color: #000;
     font-size: 20px;
