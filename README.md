@@ -59,10 +59,11 @@ python app.py
 
 💡 Примечание: _Если в папке Яндекс Диска уже есть файл `index.json`, новые данные объединяются с существующими._
 
+
 ## ⚙️ Скриншоты
 
 <img src="https://github.com/user-attachments/assets/c00b5c4a-7a6d-49cc-af64-6747ec456868" align="center" width="400"/>
-<img src="https://github.com/user-attachments/assets/5d665d8c-1812-4296-885b-f32196ddfa69" align="center" width="400"/>
+<img src="https://github.com/user-attachments/assets/9b9e5425-d7d1-4caa-9389-0eb17fc20906" align="center" width="400"/>
 <p></p>
 <img src="https://github.com/user-attachments/assets/b9fd4159-7832-4158-8f61-08242ea1bab9" align="center" width="400"/>
 <img src="https://github.com/user-attachments/assets/4710006b-ff0c-4e96-873c-9186c5d81ccf" align="center" width="400"/>
