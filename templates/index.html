@@ -46,8 +46,21 @@
         </div>
         
         <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Обработка файлов...</p>
+            <div class="progress-container">
+                <div class="progress-header">
+                    <span id="currentStage" class="current-stage">Инициализация...</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                    <div class="progress-bar" id="mainProgressBar">
+                        <div class="progress-bar-fill" id="mainProgressFill"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="progressPercentage">0%</span>
+                        <span id="progressCounter">0/0</span>
+                    </div>
+                </div>
+                <div id="fileProgressList" class="file-progress-list"></div>
+            </div>
         </div>
     </div>
     
@@ -76,6 +89,15 @@
             loading.style.display = 'block';
             results.style.display = 'none';
             uploadBtn.disabled = true;
+            
+            // Сбрасываем прогресс
+            document.getElementById('currentStage').textContent = 'Загрузка файлов...';
+            document.getElementById('progressPercentage').textContent = '0%';
+            document.getElementById('progressCounter').textContent = '0/0';
+            document.getElementById('mainProgressFill').style.width = '0%';
+            document.getElementById('fileProgressList').innerHTML = '';
+            
+            let eventSource = null;
             
             try {
                 const response = await fetch('/upload', {
@@ -107,35 +129,109 @@
                     return;
                 }
                 
-                // Отображаем результаты
-                if (data.processed && data.processed.length > 0) {
-                    processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
-                        data.processed.map(f => {
-                            const parts = [];
-                            if (f.category_t) parts.push(f.category_t);
-                            if (f.title) parts.push(f.title);
-                            const infoPart = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
-                            return `<li>${f.name}${infoPart} (${f.size})</li>`;
-                        }).join('') +
-                        '</ul>';
-                } else {
-                    processedFiles.innerHTML = '';
-                }
+                // Подключаемся к SSE потоку
+                const sessionId = data.session_id;
+                eventSource = new EventSource(`/progress/${sessionId}`);
                 
-                if (data.failed && data.failed.length > 0) {
-                    failedFiles.innerHTML = '<h3>Пропущено:</h3><ul>' +
-                        data.failed.map(f => `<li>${f.name} (${f.size}): ${f.error || 'Неизвестная ошибка'}</li>`).join('') +
-                        '</ul>';
-                } else {
-                    failedFiles.innerHTML = '';
-                }
+                eventSource.addEventListener('progress', (e) => {
+                    const progressData = JSON.parse(e.data);
+                    
+                    // Обновляем общий прогресс
+                    if (progressData.current_stage) {
+                        document.getElementById('currentStage').textContent = progressData.current_stage;
+                    }
+                    
+                    if (progressData.percentage !== undefined) {
+                        document.getElementById('progressPercentage').textContent = `${progressData.percentage}%`;
+                        document.getElementById('mainProgressFill').style.width = `${progressData.percentage}%`;
+                    }
+                    
+                    if (progressData.current !== undefined && progressData.total !== undefined) {
+                        document.getElementById('progressCounter').textContent = `${progressData.current}/${progressData.total}`;
+                    }
+                    
+                    // Обновляем прогресс по файлам
+                    if (progressData.file_progress) {
+                        const fileProgressList = document.getElementById('fileProgressList');
+                        fileProgressList.innerHTML = '';
+                        
+                        Object.entries(progressData.file_progress).forEach(([filename, fileData]) => {
+                            const fileDiv = document.createElement('div');
+                            fileDiv.className = 'file-progress-item';
+                            
+                            const statusClass = fileData.status === 'completed' ? 'completed' : 
+                                              fileData.status === 'failed' ? 'failed' : 'processing';
+                            
+                            fileDiv.innerHTML = `
+                                <div class="file-progress-name ${statusClass}">${filename}</div>
+                                <div class="file-progress-bar">
+                                    <div class="file-progress-fill ${statusClass}" style="width: ${fileData.progress || 0}%"></div>
+                                </div>
+                                ${fileData.error ? `<div class="file-progress-error">${fileData.error}</div>` : ''}
+                            `;
+                            fileProgressList.appendChild(fileDiv);
+                        });
+                    }
+                    
+                    // Если обработка завершена
+                    if (progressData.status === 'completed') {
+                        eventSource.close();
+                        
+                        // Отображаем результаты
+                        if (progressData.processed && progressData.processed.length > 0) {
+                            processedFiles.innerHTML = '<h3>Загружено:</h3><ul>' +
+                                progressData.processed.map(f => {
+                                    const parts = [];
+                                    if (f.category_t) parts.push(f.category_t);
+                                    if (f.title) parts.push(f.title);
+                                    const infoPart = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
+                                    return `<li>${f.name}${infoPart} (${f.size})</li>`;
+                                }).join('') +
+                                '</ul>';
+                        } else {
+                            processedFiles.innerHTML = '';
+                        }
+                        
+                        if (progressData.failed && progressData.failed.length > 0) {
+                            failedFiles.innerHTML = '<h3>Пропущено:</h3><ul>' +
+                                progressData.failed.map(f => `<li>${f.name} (${f.size}): ${f.error || 'Неизвестная ошибка'}</li>`).join('') +
+                                '</ul>';
+                        } else {
+                            failedFiles.innerHTML = '';
+                        }
+                        
+                        results.style.display = 'block';
+                        loading.style.display = 'none';
+                        uploadBtn.disabled = false;
+                        fileInput.value = '';
+                    }
+                    
+                    // Если произошла ошибка
+                    if (progressData.status === 'error') {
+                        eventSource.close();
+                        alert('Ошибка обработки: ' + (progressData.error || 'Неизвестная ошибка'));
+                        loading.style.display = 'none';
+                        uploadBtn.disabled = false;
+                        fileInput.value = '';
+                    }
+                });
                 
-                results.style.display = 'block';
+                eventSource.onerror = (error) => {
+                    console.error('Ошибка SSE:', error);
+                    if (eventSource) {
+                        eventSource.close();
+                    }
+                    alert('Ошибка подключения к потоку прогресса');
+                    loading.style.display = 'none';
+                    uploadBtn.disabled = false;
+                };
                 
             } catch (error) {
                 console.error('Ошибка загрузки:', error);
+                if (eventSource) {
+                    eventSource.close();
+                }
                 alert('Ошибка загрузки: ' + (error.message || 'Неизвестная ошибка'));
-            } finally {
                 loading.style.display = 'none';
                 uploadBtn.disabled = false;
                 fileInput.value = '';
