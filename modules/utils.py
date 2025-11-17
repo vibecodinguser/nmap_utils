@@ -6,6 +6,7 @@ LOCAL_DATA_FOLDER = "./data"
 ALLOWED_EXTENSIONS = {"zip"}
 ALLOWED_GEOJSON_EXTENSIONS = {"geojson", "json"}
 ALLOWED_GPX_EXTENSIONS = {"gpx"}
+ALLOWED_KML_EXTENSIONS = {"kml", "kmz"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
@@ -22,6 +23,11 @@ def allowed_geojson_file(filename):
 def allowed_gpx_file(filename):
     """Проверяет, разрешено ли расширение файла для GPX"""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_GPX_EXTENSIONS
+
+
+def allowed_kml_file(filename):
+    """Проверяет, разрешено ли расширение файла для KML/KMZ"""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_KML_EXTENSIONS
 
 
 def check_file_size(file):

@@ -44,6 +44,8 @@
             <button id="geojsonUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить GeoJSON</button>
             <input type="file" id="gpxInput" multiple accept=".gpx" style="display: none;">
             <button id="gpxUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить GPX</button>
+            <input type="file" id="kmlInput" multiple accept=".kml,.kmz" style="display: none;">
+            <button id="kmlUploadBtn" class="upload-button" {% if not token_configured %}disabled{% endif %}>Загрузить KML/KMZ</button>
         </div>
         
         <div id="results" class="results-section" style="display: none;">
@@ -77,6 +79,8 @@
         const geojsonInput = document.getElementById('geojsonInput');
         const gpxUploadBtn = document.getElementById('gpxUploadBtn');
         const gpxInput = document.getElementById('gpxInput');
+        const kmlUploadBtn = document.getElementById('kmlUploadBtn');
+        const kmlInput = document.getElementById('kmlInput');
         const results = document.getElementById('results');
         const loading = document.getElementById('loading');
         const processedFiles = document.getElementById('processedFiles');
@@ -92,6 +96,10 @@
         
         gpxUploadBtn.addEventListener('click', () => {
             gpxInput.click();
+        });
+        
+        kmlUploadBtn.addEventListener('click', () => {
+            kmlInput.click();
         });
         
         function setupFileUpload(inputElement, uploadEndpoint, buttonElement) {
@@ -110,6 +118,7 @@
                 uploadBtn.disabled = true;
                 geojsonUploadBtn.disabled = true;
                 gpxUploadBtn.disabled = true;
+                kmlUploadBtn.disabled = true;
                 
                 // Сбрасываем прогресс
                 document.getElementById('currentStage').textContent = 'Загрузка файлов...';
@@ -230,9 +239,11 @@
                             uploadBtn.disabled = false;
                             geojsonUploadBtn.disabled = false;
                             gpxUploadBtn.disabled = false;
+                            kmlUploadBtn.disabled = false;
                             fileInput.value = '';
                             geojsonInput.value = '';
                             gpxInput.value = '';
+                            kmlInput.value = '';
                         }
                         
                         // Если произошла ошибка
@@ -243,9 +254,11 @@
                             uploadBtn.disabled = false;
                             geojsonUploadBtn.disabled = false;
                             gpxUploadBtn.disabled = false;
+                            kmlUploadBtn.disabled = false;
                             fileInput.value = '';
                             geojsonInput.value = '';
                             gpxInput.value = '';
+                            kmlInput.value = '';
                         }
                     });
                     
@@ -286,6 +299,9 @@
         
         // Настраиваем загрузку для GPX файлов
         setupFileUpload(gpxInput, '/upload-gpx', gpxUploadBtn);
+        
+        // Настраиваем загрузку для KML/KMZ файлов
+        setupFileUpload(kmlInput, '/upload-kml', kmlUploadBtn);
     </script>
 </body>
 </html>

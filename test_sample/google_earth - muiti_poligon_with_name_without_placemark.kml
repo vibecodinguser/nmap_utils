@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>Карта без названия</name>
+	<gx:CascadingStyle kml:id="__managed_style_490581FE7D3BC874D923">
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>3</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_3A621EDF063BC874D923">
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>2</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_255A33EC443BC874D923">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_3A621EDF063BC874D923</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_490581FE7D3BC874D923</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="07B1D1F20B3BC876D839">
+		<name>Полигон 01</name>
+		<LookAt>
+			<longitude>39.12697705185641</longitude>
+			<latitude>44.90940965848258</latitude>
+			<altitude>21.38393203188877</altitude>
+			<heading>338.5494834391429</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>14820.25989183225</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_255A33EC443BC874D923</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+				<LinearRing>
+					<coordinates>
+						39.11781572820156,44.90438130149108,0 39.1086405182168,44.89394272265162,0 39.13105416657325,44.89283116919508,0 39.11781572820156,44.90438130149108,0 
+					</coordinates>
+				</LinearRing>
+			</outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+	<Placemark id="001E392B4D3BC87770E4">
+		<name>Полигон 02</name>
+		<LookAt>
+			<longitude>39.13639573802055</longitude>
+			<latitude>44.90751399153535</latitude>
+			<altitude>23.76514204378569</altitude>
+			<heading>338.5494938113807</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>6813.181047103135</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_255A33EC443BC874D923</styleUrl>
+		<Polygon>
+			<outerBoundaryIs>
+				<LinearRing>
+					<coordinates>
+						39.13815613878213,44.91126604277157,0 39.13039394925603,44.90026579052797,0 39.1542816028827,44.90011387290595,0 39.15177025771274,44.91225506103469,0 39.13815613878213,44.91126604277157,0 
+					</coordinates>
+				</LinearRing>
+			</outerBoundaryIs>
+		</Polygon>
+	</Placemark>
+</Document>
+</kml>

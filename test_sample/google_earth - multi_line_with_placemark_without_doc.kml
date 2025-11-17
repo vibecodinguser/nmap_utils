@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name></name>
+	<gx:CascadingStyle kml:id="__managed_style_50D0DA05FA3BC87E70E8">
+		<Style>
+			<IconStyle>
+				<scale>1.2</scale>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>3</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<gx:CascadingStyle kml:id="__managed_style_42C37F3CEE3BC87E70E8">
+		<Style>
+			<IconStyle>
+				<Icon>
+					<href>https://earth.google.com/earth/document/icon?color=1976d2&amp;id=2000&amp;scale=4</href>
+				</Icon>
+				<hotSpot x="64" y="128" xunits="pixels" yunits="insetPixels"/>
+			</IconStyle>
+			<LabelStyle>
+			</LabelStyle>
+			<LineStyle>
+				<color>ff2dc0fb</color>
+				<width>2</width>
+			</LineStyle>
+			<PolyStyle>
+				<color>40ffffff</color>
+			</PolyStyle>
+			<BalloonStyle>
+				<displayMode>hide</displayMode>
+			</BalloonStyle>
+		</Style>
+	</gx:CascadingStyle>
+	<StyleMap id="__managed_style_3F03CD2E813BC87E70E8">
+		<Pair>
+			<key>normal</key>
+			<styleUrl>#__managed_style_42C37F3CEE3BC87E70E8</styleUrl>
+		</Pair>
+		<Pair>
+			<key>highlight</key>
+			<styleUrl>#__managed_style_50D0DA05FA3BC87E70E8</styleUrl>
+		</Pair>
+	</StyleMap>
+	<Placemark id="01436B1B7D3BC87E70E6">
+		<name>Трек 01</name>
+		<LookAt>
+			<longitude>39.35815950778051</longitude>
+			<latitude>45.04848307873732</latitude>
+			<altitude>40.21002640163905</altitude>
+			<heading>338.7195787869664</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>9288.404030506499</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_3F03CD2E813BC87E70E8</styleUrl>
+		<LineString>
+			<coordinates>
+				39.39747378254834,45.06772588241107,0 39.39131828216759,45.04617888293391,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+	<Placemark id="0BC5530EF53BC8822994">
+		<name>Трек 02</name>
+		<LookAt>
+			<longitude>39.37826618473274</longitude>
+			<latitude>45.05045111929435</latitude>
+			<altitude>29.65880430020077</altitude>
+			<heading>338.7305212105298</heading>
+			<tilt>0</tilt>
+			<gx:fovy>35</gx:fovy>
+			<range>12385.66334626987</range>
+			<altitudeMode>absolute</altitudeMode>
+		</LookAt>
+		<styleUrl>#__managed_style_3F03CD2E813BC87E70E8</styleUrl>
+		<LineString>
+			<coordinates>
+				39.37733164136778,45.06375414139622,0 39.41012425815282,45.05147540563634,0 
+			</coordinates>
+		</LineString>
+	</Placemark>
+</Document>
+</kml>

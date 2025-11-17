@@ -12,7 +12,8 @@ from modules.yandex_disk import ensure_folder_exists, download_index_json, uploa
 from modules.shapefile_processing import process_shapefile
 from modules.geojson_processing import process_geojson
 from modules.gpx_processing import process_gpx
-from modules.utils import allowed_file, allowed_geojson_file, allowed_gpx_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
+from modules.kml_processing import process_kml
+from modules.utils import allowed_file, allowed_geojson_file, allowed_gpx_file, allowed_kml_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "./data/uploads"
@@ -547,6 +548,169 @@ def process_gpx_thread(session_id, files_data):
         })
 
 
+def process_kml_thread(session_id, files_data):
+    """Обрабатывает KML/KMZ файлы в отдельном потоке с отслеживанием прогресса"""
+    start_time = datetime.now()
+    processed_files = []
+    failed_files = []
+    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
+    total_steps = 3 + len(files_data) + 2
+    current_step = 0
+    
+    try:
+        with session_lock:
+            processing_sessions[session_id] = {
+                "status": "processing",
+                "total": total_steps,
+                "current": 0,
+                "percentage": 0,
+                "current_stage": "Инициализация...",
+                "file_progress": {},
+                "processed": [],
+                "failed": [],
+                "error": None
+            }
+        
+        # Этап 1: Проверка/создание папки на Яндекс.Диске
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
+        })
+        folder_path = ensure_folder_exists()
+
+        # Этап 2: Скачивание существующего index.json
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Скачивание существующего index.json..."
+        })
+        download_index_json(folder_path)
+
+        # Этап 3: Загрузка существующих данных
+        current_step += 1
+        update_progress(session_id, {
+            "current": current_step,
+            "percentage": int((current_step / total_steps) * 100),
+            "current_stage": "Загрузка существующих данных..."
+        })
+        accumulated_data = load_index_json()
+
+        # Этап 4: Обработка каждого файла
+        for idx, file_info in enumerate(files_data, 1):
+            filename = file_info["filename"]
+            file_path = file_info["file_path"]
+            
+            current_step += 1
+            
+            with session_lock:
+                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                current_file_progress[filename] = {"status": "processing", "progress": 0}
+            
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
+                "file_progress": current_file_progress
+            })
+            
+            try:
+                # Обрабатываем KML/KMZ
+                result = process_kml(file_path)
+
+                # Извлекаем category_t и title из результата перед объединением
+                file_category = result.pop("category_t", "")
+                file_title = result.pop("title", "")
+                
+                # Объединяем с накопленными данными
+                accumulated_data = merge_data(accumulated_data, result)
+                
+                processed_files.append({
+                    "name": filename,
+                    "size": format_file_size(os.path.getsize(file_path)),
+                    "category_t": file_category,
+                    "title": file_title
+                })
+                
+                with session_lock:
+                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                    current_file_progress[filename] = {"status": "completed", "progress": 100}
+                
+                update_progress(session_id, {
+                    "file_progress": current_file_progress
+                })
+                
+
+            except Exception as e:
+                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
+                failed_files.append({
+                    "name": filename,
+                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
+                    "error": str(e)
+                })
+                with session_lock:
+                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
+                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
+                
+                update_progress(session_id, {
+                    "file_progress": current_file_progress
+                })
+            finally:
+                # Удаляем временный файл
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+
+        # Этап 5: Сохранение финального index.json
+        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
+            current_step += 1
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": "Сохранение финального index.json..."
+            })
+            local_index_path = save_index_json(accumulated_data)
+
+            # Этап 6: Загрузка на Яндекс.Диск
+            current_step += 1
+            update_progress(session_id, {
+                "current": current_step,
+                "percentage": int((current_step / total_steps) * 100),
+                "current_stage": "Загрузка index.json на Яндекс.Диск..."
+            })
+            try:
+                upload_index_json(folder_path, local_index_path)
+                # Удаляем локальный файл после успешной загрузки
+                if os.path.exists(local_index_path):
+                    os.remove(local_index_path)
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}")
+
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
+        
+        update_progress(session_id, {
+            "status": "completed",
+            "current": total_steps,
+            "percentage": 100,
+            "current_stage": "Обработка завершена",
+            "processed": processed_files,
+            "failed": failed_files
+        })
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        logger.error(f"Критическая ошибка обработки: {str(e)}", exc_info=True)
+        update_progress(session_id, {
+            "status": "error",
+            "error": str(e),
+            "current_stage": f"Ошибка: {str(e)}"
+        })
+
+
 @app.route("/upload", methods=["POST"])
 def upload_files():
     """Обработка загрузки файлов - сохраняет файлы и запускает обработку"""
@@ -690,6 +854,58 @@ def upload_gpx_files():
     
     # Запускаем обработку в отдельном потоке
     thread = threading.Thread(target=process_gpx_thread, args=(session_id, files_data))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"session_id": session_id})
+
+
+@app.route("/upload-kml", methods=["POST"])
+def upload_kml_files():
+    """Обработка загрузки KML/KMZ файлов - сохраняет файлы и запускает обработку"""
+    logger.info(f"POST /upload-kml - Начало загрузки KML/KMZ файлов с IP: {request.remote_addr}")
+    
+    if not is_token_configured():
+        logger.warning("Попытка загрузки без настроенного OAuth токена")
+        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
+
+    if "files" not in request.files:
+        logger.warning("Запрос без файлов")
+        return jsonify({"error": "Файлы не найдены"}), 400
+
+    files = request.files.getlist("files")
+
+    if not files or files[0].filename == "":
+        logger.warning("Файлы не выбраны")
+        return jsonify({"error": "Файлы не выбраны"}), 400
+
+    logger.info(f"Получено KML/KMZ файлов для обработки: {len(files)}")
+    
+    # Создаём session_id
+    session_id = str(uuid.uuid4())
+    files_data = []
+    
+    # Сохраняем файлы
+    for file in files:
+        if not allowed_kml_file(file.filename):
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            continue
+
+        if not check_file_size(file):
+            continue
+            
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
+        file.save(file_path)
+        files_data.append({"filename": filename, "file_path": file_path})
+    
+    if not files_data:
+        return jsonify({"error": "Нет валидных KML/KMZ файлов для обработки"}), 400
+    
+    # Запускаем обработку в отдельном потоке
+    thread = threading.Thread(target=process_kml_thread, args=(session_id, files_data))
     thread.daemon = True
     thread.start()
     
