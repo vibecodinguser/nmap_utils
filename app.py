@@ -1,976 +1,192 @@
-"""Точка входа Flask приложения"""
 import os
-import json
+import logging
 import uuid
 import threading
-import logging
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from queue import Queue
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
-from config import YANDEX_DISK_API_KEY
-from modules.yandex_disk import ensure_folder_exists, download_index_json, upload_index_json
-from modules.shapefile_processing import process_shapefile
-from modules.geojson_processing import process_geojson
-from modules.gpx_processing import process_gpx
-from modules.kml_processing import process_kml
-from modules.utils import allowed_file, allowed_geojson_file, allowed_gpx_file, allowed_kml_file, check_file_size, load_index_json, merge_data, save_index_json, format_file_size
+from modules.prcs_flow import create_nmap_output_template, merge_nmap_output_template, ProcessingError
+from modules.prcs_shp import process_zip
+from modules.prcs_geojson import process_geojson
+from modules.prcs_gpx import process_gpx
+from modules.prcs_kml import process_kml
+from modules.prcs_topojson import process_topojson
+from modules.prcs_wkt import process_wkt
+from modules.prcs_upload import download_index_json, upload_index_json, ensure_folder, get_current_day_folder_path, BASE_FOLDER_PATH
+from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file
 
-app = Flask(__name__)
-UPLOAD_FOLDER = "./data/uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
+app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Создаём необходимые директории
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_EXTENSIONS = {'zip', 'geojson', 'gpx', 'kml', 'kmz', 'topojson', 'wkt'}
 
-# Хранилище для прогресса обработки по session_id
-processing_sessions = {}
-session_lock = threading.Lock()
+# Session-based log queues
+log_queues = {}
 
 
-def is_token_configured():
-    """Проверяет, настроен ли OAuth токен"""
-    return YANDEX_DISK_API_KEY != "_your_OAuth_token_here_"
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def send_sse_event(event_type, data):
-    """Форматирует событие SSE"""
-    return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
-def update_progress(session_id, progress_data):
-    """Обновляет прогресс обработки для сессии"""
-    with session_lock:
-        if session_id in processing_sessions:
-            processing_sessions[session_id].update(progress_data)
-
-
-@app.route("/")
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    """Главная страница"""
-    return render_template("index.html", token_configured=is_token_configured())
+    if request.method == 'POST':
+        uploaded_files = request.files.getlist('files')
+        uploaded_files = [f for f in uploaded_files if f.filename != '']
+
+        if not uploaded_files:
+            return render_template('index.html', error="No files selected")
+
+        processed_files = []
+        skipped_files = []
+        logs = []
+
+        class LogCollector(logging.Handler):
+            def emit(self, record):
+                from datetime import datetime
+                logs.append({
+                    'time': datetime.now().strftime('%H:%M:%S'),
+                    'level': record.levelname.lower(),
+                    'message': self.format(record)
+                })
+
+        log_collector = LogCollector()
+        log_collector.setLevel(logging.INFO)
+        log_collector.setFormatter(logging.Formatter('%(message)s'))
+        logger.addHandler(log_collector)
+
+        try:
+            logger.info("Проверка наличия базовой папки в Блокноте картографа")
+            try:
+                ensure_folder(BASE_FOLDER_PATH)
+                logger.info("✓ Базовая папка есть")
+                
+                logger.info("Проверка наличия папки для текущей даты")
+                ensure_folder(get_current_day_folder_path())
+                logger.info("✓ Папка для текущей даты есть")
+            except ProcessingError as e:
+                logger.error(f"Ошибка Яндекс.Диска: {e.message}")
+                return render_template('index.html', error=f"Yandex.Disk Error: {e.message}", logs=logs)
+
+            logger.info("Загрузка текущего файла index.json")
+            try:
+                current_index = download_index_json()
+                if current_index is None:
+                    current_index = create_nmap_output_template()
+                    logger.info("Создан новый файл index.json")
+                else:
+                    logger.info("✓ Загружен")
+            except ProcessingError as e:
+                logger.error(f"Не удалось загрузить обновленный файл index.json: {e.message}")
+                return render_template('index.html', error=f"Failed to retrieve index.json: {e.message}", logs=logs)
+
+            new_data_to_merge = create_nmap_output_template()
+            logger.info(f"Обработка {len(uploaded_files)} выбранных файл(ов)")
+
+            for file in uploaded_files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    logger.info(f"✓ Обработали: {filename}")
+                    temp_path = os.path.join("/tmp", filename)
+                    try:
+                        file.save(temp_path)
+                        logger.info(f"✓ Сохранили во временную папку")
+
+                        if filename.endswith('.zip'):
+                            logger.info(f"Парсинг и конвертация Shapefile")
+                            result = process_zip(temp_path)
+                        elif filename.endswith('.geojson'):
+                            logger.info(f"Парсинг и конвертация GeoJSON")
+                            result = process_geojson(temp_path)
+                        elif filename.endswith('.gpx'):
+                            logger.info(f"Парсинг и конвертация GPX")
+                            result = process_gpx(temp_path)
+                        elif filename.endswith('.kml') or filename.endswith('.kmz'):
+                            logger.info(f"Парсинг и конвертация KML/KMZ")
+                            result = process_kml(temp_path)
+                        elif filename.endswith('.topojson'):
+                            logger.info(f"Парсинг и конвертация TopoJSON")
+                            result = process_topojson(temp_path)
+                        elif filename.endswith('.wkt'):
+                            logger.info(f"Парсинг и конвертация WKT")
+                            result = process_wkt(temp_path)
+
+                        new_data_to_merge = merge_nmap_output_template(new_data_to_merge, result)
+                        display_items = result.get('metadata', [])
+                        desc_str = "; ".join(display_items) if display_items else "No description"
+
+                        processed_files.append({"name": filename, "desc": desc_str})
+                        logger.info(f"✓ {filename} сконвертирован в файл index.json")
+
+                    except ProcessingError as e:
+                        skipped_files.append({"name": filename, "reason": e.message})
+                        logger.error(f"✗ {filename}: {e.message}")
+                    except Exception as e:
+                        skipped_files.append({"name": filename, "reason": f"Unexpected error: {str(e)}"})
+                        logger.error(f"✗ {filename}: Неожиданная ошибка - {str(e)}")
+                    finally:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                else:
+                    skipped_files.append({"name": file.filename,
+                                          "reason": "Invalid file type (must be .zip, .geojson, .gpx, .kml, .kmz, .topojson, .wkt)"})
+                    logger.warning(f"Пропущен {file.filename}: неверный тип файла")
+            if processed_files:
+                logger.info("Загрузка результатов в Блокнот картографа")
+                try:
+                    final_index = merge_nmap_output_template(current_index, new_data_to_merge)
+                    upload_index_json(final_index)
+                    logger.info("✓ Загружен")
+                except ProcessingError as e:
+                    logger.error(f"Ошибка сохранения: {e.message}")
+                    return render_template('index.html', error=f"Failed to save results to Yandex.Disk: {e.message}",
+                                           processed=processed_files, skipped=skipped_files, logs=logs)
+            logger.info(f"Выбранные файлы загружены: {len(processed_files)} успешно, {len(skipped_files)} пропущено")
+        finally:
+            logger.removeHandler(log_collector)
+        return render_template('index.html', processed=processed_files, skipped=skipped_files, logs=logs)
+    return render_template('index.html')
 
 
-def process_files_thread(session_id, files_data):
-    """Обрабатывает файлы в отдельном потоке с отслеживанием прогресса"""
-    start_time = datetime.now()
-    processed_files = []
-    failed_files = []
-    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
-    total_steps = 3 + len(files_data) + 2
-    current_step = 0
+@app.route('/stream-logs/<session_id>')
+def stream_logs(session_id):
+    """SSE endpoint for streaming logs in real-time"""
+    return create_sse_stream(session_id, log_queues)
+
+
+@app.route('/upload-async', methods=['POST'])
+def upload_async():
+    """Async upload endpoint that processes files and streams logs"""
     
-    try:
-        with session_lock:
-            processing_sessions[session_id] = {
-                "status": "processing",
-                "total": total_steps,
-                "current": 0,
-                "percentage": 0,
-                "current_stage": "Инициализация...",
-                "file_progress": {},
-                "processed": [],
-                "failed": [],
-                "error": None
-            }
-        
-        # Этап 1: Проверка/создание папки на Яндекс.Диске
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
-        })
-        folder_path = ensure_folder_exists()
-
-        # Этап 2: Скачивание существующего index.json
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Скачивание существующего index.json..."
-        })
-        download_index_json(folder_path)
-
-        # Этап 3: Загрузка существующих данных
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Загрузка существующих данных..."
-        })
-        accumulated_data = load_index_json()
-
-        # Этап 4: Обработка каждого файла
-        for idx, file_info in enumerate(files_data, 1):
-            filename = file_info["filename"]
-            file_path = file_info["file_path"]
-            
-            current_step += 1
-            
-            with session_lock:
-                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                current_file_progress[filename] = {"status": "processing", "progress": 0}
-            
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
-                "file_progress": current_file_progress
-            })
-
-            try:
-                # Обрабатываем shapefile
-                result = process_shapefile(file_path)
-                
-                # Извлекаем category_t и title из результата перед объединением
-                file_category = result.pop("category_t", "")
-                file_title = result.pop("title", "")
-                
-                # Объединяем с накопленными данными
-                accumulated_data = merge_data(accumulated_data, result)
-                
-                processed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)),
-                    "category_t": file_category,
-                    "title": file_title
-                })
-                
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "completed", "progress": 100}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-                
-
-            except Exception as e:
-                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
-                failed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
-                    "error": str(e)
-                })
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-            finally:
-                # Удаляем временный файл
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-
-        # Этап 5: Сохранение финального index.json
-        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Сохранение финального index.json..."
-            })
-            local_index_path = save_index_json(accumulated_data)
-
-            # Этап 6: Загрузка на Яндекс.Диск
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Загрузка index.json на Яндекс.Диск..."
-            })
-            try:
-                upload_index_json(folder_path, local_index_path)
-                # Удаляем локальный файл после успешной загрузки
-                if os.path.exists(local_index_path):
-                    os.remove(local_index_path)
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}")
-
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
-        
-        update_progress(session_id, {
-            "status": "completed",
-            "current": total_steps,
-            "percentage": 100,
-            "current_stage": "Обработка завершена",
-            "processed": processed_files,
-            "failed": failed_files
-        })
-
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.error(f"Критическая ошибка обработки: {str(e)}", exc_info=True)
-        update_progress(session_id, {
-            "status": "error",
-            "error": str(e),
-            "current_stage": f"Ошибка: {str(e)}"
-        })
-
-
-def process_geojson_thread(session_id, files_data):
-    """Обрабатывает GeoJSON файлы в отдельном потоке с отслеживанием прогресса"""
-    start_time = datetime.now()
-    processed_files = []
-    failed_files = []
-    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
-    total_steps = 3 + len(files_data) + 2
-    current_step = 0
-    
-    try:
-        with session_lock:
-            processing_sessions[session_id] = {
-                "status": "processing",
-                "total": total_steps,
-                "current": 0,
-                "percentage": 0,
-                "current_stage": "Инициализация...",
-                "file_progress": {},
-                "processed": [],
-                "failed": [],
-                "error": None
-            }
-        
-        # Этап 1: Проверка/создание папки на Яндекс.Диске
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
-        })
-        folder_path = ensure_folder_exists()
-
-        # Этап 2: Скачивание существующего index.json
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Скачивание существующего index.json..."
-        })
-        download_index_json(folder_path)
-
-        # Этап 3: Загрузка существующих данных
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Загрузка существующих данных..."
-        })
-        accumulated_data = load_index_json()
-
-        # Этап 4: Обработка каждого файла
-        for idx, file_info in enumerate(files_data, 1):
-            filename = file_info["filename"]
-            file_path = file_info["file_path"]
-            
-            current_step += 1
-            
-            with session_lock:
-                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                current_file_progress[filename] = {"status": "processing", "progress": 0}
-            
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
-                "file_progress": current_file_progress
-            })
-            
-            try:
-                # Обрабатываем GeoJSON
-                result = process_geojson(file_path)
-
-                # Извлекаем category_t и title из результата перед объединением
-                file_category = result.pop("category_t", "")
-                file_title = result.pop("title", "")
-                
-                # Объединяем с накопленными данными
-                accumulated_data = merge_data(accumulated_data, result)
-                
-                processed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)),
-                    "category_t": file_category,
-                    "title": file_title
-                })
-                
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "completed", "progress": 100}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-                
-
-            except Exception as e:
-                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
-                failed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
-                    "error": str(e)
-                })
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-            finally:
-                # Удаляем временный файл
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-
-        # Этап 5: Сохранение финального index.json
-        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Сохранение финального index.json..."
-            })
-            local_index_path = save_index_json(accumulated_data)
-
-            # Этап 6: Загрузка на Яндекс.Диск
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Загрузка index.json на Яндекс.Диск..."
-            })
-            try:
-                upload_index_json(folder_path, local_index_path)
-                # Удаляем локальный файл после успешной загрузки
-                if os.path.exists(local_index_path):
-                    os.remove(local_index_path)
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}")
-
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
-        
-        update_progress(session_id, {
-            "status": "completed",
-            "current": total_steps,
-            "percentage": 100,
-            "current_stage": "Обработка завершена",
-            "processed": processed_files,
-            "failed": failed_files
-        })
-
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.error(f"Критическая ошибка обработки: {str(e)}", exc_info=True)
-        update_progress(session_id, {
-            "status": "error",
-            "error": str(e),
-            "current_stage": f"Ошибка: {str(e)}"
-        })
-
-
-def process_gpx_thread(session_id, files_data):
-    """Обрабатывает GPX файлы в отдельном потоке с отслеживанием прогресса"""
-    start_time = datetime.now()
-    processed_files = []
-    failed_files = []
-    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
-    total_steps = 3 + len(files_data) + 2
-    current_step = 0
-    
-    try:
-        with session_lock:
-            processing_sessions[session_id] = {
-                "status": "processing",
-                "total": total_steps,
-                "current": 0,
-                "percentage": 0,
-                "current_stage": "Инициализация...",
-                "file_progress": {},
-                "processed": [],
-                "failed": [],
-                "error": None
-            }
-        
-        # Этап 1: Проверка/создание папки на Яндекс.Диске
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
-        })
-        folder_path = ensure_folder_exists()
-
-        # Этап 2: Скачивание существующего index.json
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Скачивание существующего index.json..."
-        })
-        download_index_json(folder_path)
-
-        # Этап 3: Загрузка существующих данных
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Загрузка существующих данных..."
-        })
-        accumulated_data = load_index_json()
-
-        # Этап 4: Обработка каждого файла
-        for idx, file_info in enumerate(files_data, 1):
-            filename = file_info["filename"]
-            file_path = file_info["file_path"]
-            
-            current_step += 1
-            
-            with session_lock:
-                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                current_file_progress[filename] = {"status": "processing", "progress": 0}
-            
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
-                "file_progress": current_file_progress
-            })
-            
-            try:
-                # Обрабатываем GPX
-                result = process_gpx(file_path)
-
-                # Извлекаем category_t и title из результата перед объединением
-                file_category = result.pop("category_t", "")
-                file_title = result.pop("title", "")
-                
-                # Объединяем с накопленными данными
-                accumulated_data = merge_data(accumulated_data, result)
-                
-                processed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)),
-                    "category_t": file_category,
-                    "title": file_title
-                })
-                
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "completed", "progress": 100}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-                
-
-            except Exception as e:
-                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
-                failed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
-                    "error": str(e)
-                })
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-            finally:
-                # Удаляем временный файл
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-
-        # Этап 5: Сохранение финального index.json
-        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Сохранение финального index.json..."
-            })
-            local_index_path = save_index_json(accumulated_data)
-
-            # Этап 6: Загрузка на Яндекс.Диск
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Загрузка index.json на Яндекс.Диск..."
-            })
-            try:
-                upload_index_json(folder_path, local_index_path)
-                # Удаляем локальный файл после успешной загрузки
-                if os.path.exists(local_index_path):
-                    os.remove(local_index_path)
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}")
-
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
-        
-        update_progress(session_id, {
-            "status": "completed",
-            "current": total_steps,
-            "percentage": 100,
-            "current_stage": "Обработка завершена",
-            "processed": processed_files,
-            "failed": failed_files
-        })
-
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.error(f"Критическая ошибка обработки: {str(e)}", exc_info=True)
-        update_progress(session_id, {
-            "status": "error",
-            "error": str(e),
-            "current_stage": f"Ошибка: {str(e)}"
-        })
-
-
-def process_kml_thread(session_id, files_data):
-    """Обрабатывает KML/KMZ файлы в отдельном потоке с отслеживанием прогресса"""
-    start_time = datetime.now()
-    processed_files = []
-    failed_files = []
-    # 3 этапа до обработки файлов + обработка каждого файла + 2 этапа после обработки
-    total_steps = 3 + len(files_data) + 2
-    current_step = 0
-    
-    try:
-        with session_lock:
-            processing_sessions[session_id] = {
-                "status": "processing",
-                "total": total_steps,
-                "current": 0,
-                "percentage": 0,
-                "current_stage": "Инициализация...",
-                "file_progress": {},
-                "processed": [],
-                "failed": [],
-                "error": None
-            }
-        
-        # Этап 1: Проверка/создание папки на Яндекс.Диске
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Проверка/создание папки на Яндекс.Диске..."
-        })
-        folder_path = ensure_folder_exists()
-
-        # Этап 2: Скачивание существующего index.json
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Скачивание существующего index.json..."
-        })
-        download_index_json(folder_path)
-
-        # Этап 3: Загрузка существующих данных
-        current_step += 1
-        update_progress(session_id, {
-            "current": current_step,
-            "percentage": int((current_step / total_steps) * 100),
-            "current_stage": "Загрузка существующих данных..."
-        })
-        accumulated_data = load_index_json()
-
-        # Этап 4: Обработка каждого файла
-        for idx, file_info in enumerate(files_data, 1):
-            filename = file_info["filename"]
-            file_path = file_info["file_path"]
-            
-            current_step += 1
-            
-            with session_lock:
-                current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                current_file_progress[filename] = {"status": "processing", "progress": 0}
-            
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": f"Обработка файла {idx}/{len(files_data)}: {filename}",
-                "file_progress": current_file_progress
-            })
-            
-            try:
-                # Обрабатываем KML/KMZ
-                result = process_kml(file_path)
-
-                # Извлекаем category_t и title из результата перед объединением
-                file_category = result.pop("category_t", "")
-                file_title = result.pop("title", "")
-                
-                # Объединяем с накопленными данными
-                accumulated_data = merge_data(accumulated_data, result)
-                
-                processed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)),
-                    "category_t": file_category,
-                    "title": file_title
-                })
-                
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "completed", "progress": 100}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-                
-
-            except Exception as e:
-                logger.error(f"Ошибка при обработке файла {filename}: {str(e)}", exc_info=True)
-                failed_files.append({
-                    "name": filename,
-                    "size": format_file_size(os.path.getsize(file_path)) if os.path.exists(file_path) else "0 B",
-                    "error": str(e)
-                })
-                with session_lock:
-                    current_file_progress = processing_sessions[session_id].get("file_progress", {}).copy()
-                    current_file_progress[filename] = {"status": "failed", "progress": 0, "error": str(e)}
-                
-                update_progress(session_id, {
-                    "file_progress": current_file_progress
-                })
-            finally:
-                # Удаляем временный файл
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-
-        # Этап 5: Сохранение финального index.json
-        if processed_files or accumulated_data.get("paths") or accumulated_data.get("points"):
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Сохранение финального index.json..."
-            })
-            local_index_path = save_index_json(accumulated_data)
-
-            # Этап 6: Загрузка на Яндекс.Диск
-            current_step += 1
-            update_progress(session_id, {
-                "current": current_step,
-                "percentage": int((current_step / total_steps) * 100),
-                "current_stage": "Загрузка index.json на Яндекс.Диск..."
-            })
-            try:
-                upload_index_json(folder_path, local_index_path)
-                # Удаляем локальный файл после успешной загрузки
-                if os.path.exists(local_index_path):
-                    os.remove(local_index_path)
-            except Exception as e:
-                logger.warning(f"Не удалось загрузить на Яндекс.Диск: {str(e)}")
-
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.info(f"Обработка завершена за {elapsed_time:.2f} сек. Успешно: {len(processed_files)}, Ошибок: {len(failed_files)}")
-        
-        update_progress(session_id, {
-            "status": "completed",
-            "current": total_steps,
-            "percentage": 100,
-            "current_stage": "Обработка завершена",
-            "processed": processed_files,
-            "failed": failed_files
-        })
-
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        logger.error(f"Критическая ошибка обработки: {str(e)}", exc_info=True)
-        update_progress(session_id, {
-            "status": "error",
-            "error": str(e),
-            "current_stage": f"Ошибка: {str(e)}"
-        })
-
-
-@app.route("/upload", methods=["POST"])
-def upload_files():
-    """Обработка загрузки файлов - сохраняет файлы и запускает обработку"""
-    if not is_token_configured():
-        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
-
-    if "files" not in request.files:
-        return jsonify({"error": "Файлы не найдены"}), 400
-
-    files = request.files.getlist("files")
-
-    if not files or files[0].filename == "":
-        return jsonify({"error": "Файлы не выбраны"}), 400
-    
-    # Создаём session_id
     session_id = str(uuid.uuid4())
-    files_data = []
+    log_queue = Queue()
+    log_queues[session_id] = log_queue
     
-    # Сохраняем файлы
-    for file in files:
-        if not allowed_file(file.filename):
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            file.seek(0)
-            continue
-
-        if not check_file_size(file):
-            continue
-            
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
-        file.save(file_path)
-        files_data.append({"filename": filename, "file_path": file_path})
+    uploaded_files = request.files.getlist('files')
+    uploaded_files = [f for f in uploaded_files if f.filename != '']
     
-    if not files_data:
-        return jsonify({"error": "Нет валидных файлов для обработки"}), 400
+    # Save files to temp directory before background processing
+    # File objects can't be used after request context ends
+    temp_files = []
+    for file in uploaded_files:
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            temp_path = os.path.join("/tmp", f"{session_id}_{filename}")
+            file.save(temp_path)
+            temp_files.append((temp_path, filename))
     
-    # Запускаем обработку в отдельном потоке
-    thread = threading.Thread(target=process_files_thread, args=(session_id, files_data))
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({"session_id": session_id})
-
-
-@app.route("/upload-geojson", methods=["POST"])
-def upload_geojson_files():
-    """Обработка загрузки GeoJSON файлов - сохраняет файлы и запускает обработку"""
-    logger.info(f"POST /upload-geojson - Начало загрузки GeoJSON файлов с IP: {request.remote_addr}")
-    
-    if not is_token_configured():
-        logger.warning("Попытка загрузки без настроенного OAuth токена")
-        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
-
-    if "files" not in request.files:
-        logger.warning("Запрос без файлов")
-        return jsonify({"error": "Файлы не найдены"}), 400
-
-    files = request.files.getlist("files")
-
-    if not files or files[0].filename == "":
-        logger.warning("Файлы не выбраны")
-        return jsonify({"error": "Файлы не выбраны"}), 400
-
-    logger.info(f"Получено GeoJSON файлов для обработки: {len(files)}")
-    
-    # Создаём session_id
-    session_id = str(uuid.uuid4())
-    files_data = []
-    
-    # Сохраняем файлы
-    for file in files:
-        if not allowed_geojson_file(file.filename):
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            file.seek(0)
-            continue
-
-        if not check_file_size(file):
-            continue
-            
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
-        file.save(file_path)
-        files_data.append({"filename": filename, "file_path": file_path})
-    
-    if not files_data:
-        return jsonify({"error": "Нет валидных GeoJSON файлов для обработки"}), 400
-    
-    # Запускаем обработку в отдельном потоке
-    thread = threading.Thread(target=process_geojson_thread, args=(session_id, files_data))
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({"session_id": session_id})
-
-
-@app.route("/upload-gpx", methods=["POST"])
-def upload_gpx_files():
-    """Обработка загрузки GPX файлов - сохраняет файлы и запускает обработку"""
-    logger.info(f"POST /upload-gpx - Начало загрузки GPX файлов с IP: {request.remote_addr}")
-    
-    if not is_token_configured():
-        logger.warning("Попытка загрузки без настроенного OAuth токена")
-        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
-
-    if "files" not in request.files:
-        logger.warning("Запрос без файлов")
-        return jsonify({"error": "Файлы не найдены"}), 400
-
-    files = request.files.getlist("files")
-
-    if not files or files[0].filename == "":
-        logger.warning("Файлы не выбраны")
-        return jsonify({"error": "Файлы не выбраны"}), 400
-
-    logger.info(f"Получено GPX файлов для обработки: {len(files)}")
-    
-    # Создаём session_id
-    session_id = str(uuid.uuid4())
-    files_data = []
-    
-    # Сохраняем файлы
-    for file in files:
-        if not allowed_gpx_file(file.filename):
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            file.seek(0)
-            continue
-
-        if not check_file_size(file):
-            continue
-            
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
-        file.save(file_path)
-        files_data.append({"filename": filename, "file_path": file_path})
-    
-    if not files_data:
-        return jsonify({"error": "Нет валидных GPX файлов для обработки"}), 400
-    
-    # Запускаем обработку в отдельном потоке
-    thread = threading.Thread(target=process_gpx_thread, args=(session_id, files_data))
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({"session_id": session_id})
-
-
-@app.route("/upload-kml", methods=["POST"])
-def upload_kml_files():
-    """Обработка загрузки KML/KMZ файлов - сохраняет файлы и запускает обработку"""
-    logger.info(f"POST /upload-kml - Начало загрузки KML/KMZ файлов с IP: {request.remote_addr}")
-    
-    if not is_token_configured():
-        logger.warning("Попытка загрузки без настроенного OAuth токена")
-        return jsonify({"error": "Получите OAuth-токен, вставьте его в config.py и перезапустите приложение"}), 400
-
-    if "files" not in request.files:
-        logger.warning("Запрос без файлов")
-        return jsonify({"error": "Файлы не найдены"}), 400
-
-    files = request.files.getlist("files")
-
-    if not files or files[0].filename == "":
-        logger.warning("Файлы не выбраны")
-        return jsonify({"error": "Файлы не выбраны"}), 400
-
-    logger.info(f"Получено KML/KMZ файлов для обработки: {len(files)}")
-    
-    # Создаём session_id
-    session_id = str(uuid.uuid4())
-    files_data = []
-    
-    # Сохраняем файлы
-    for file in files:
-        if not allowed_kml_file(file.filename):
-            file.seek(0, os.SEEK_END)
-            file_size = file.tell()
-            file.seek(0)
-            continue
-
-        if not check_file_size(file):
-            continue
-            
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{session_id}_{filename}")
-        file.save(file_path)
-        files_data.append({"filename": filename, "file_path": file_path})
-    
-    if not files_data:
-        return jsonify({"error": "Нет валидных KML/KMZ файлов для обработки"}), 400
-    
-    # Запускаем обработку в отдельном потоке
-    thread = threading.Thread(target=process_kml_thread, args=(session_id, files_data))
-    thread.daemon = True
-    thread.start()
-    
-    return jsonify({"session_id": session_id})
-
-
-@app.route("/progress/<session_id>")
-def progress_stream(session_id):
-    """SSE поток для отслеживания прогресса обработки"""
-    def generate():
-        import time
-        last_sent = {}
-        
-        while True:
-            with session_lock:
-                session_data = processing_sessions.get(session_id)
-            
-            if session_data is None:
-                # Сессия ещё не создана, ждём
-                yield send_sse_event("progress", {
-                    "status": "waiting",
-                    "message": "Ожидание начала обработки..."
-                })
-                time.sleep(0.5)
-                continue
-            
-            status = session_data.get("status")
-            current_data = {
-                "status": status,
-                "current": session_data.get("current", 0),
-                "total": session_data.get("total", 0),
-                "percentage": session_data.get("percentage", 0),
-                "current_stage": session_data.get("current_stage", ""),
-                "file_progress": session_data.get("file_progress", {}),
-                "processed": session_data.get("processed", []),
-                "failed": session_data.get("failed", []),
-                "error": session_data.get("error")
-            }
-            
-            # Отправляем только если данные изменились
-            data_key = json.dumps(current_data, sort_keys=True)
-            if data_key != last_sent.get(session_id):
-                yield send_sse_event("progress", current_data)
-                last_sent[session_id] = data_key
-            
-            if status in ["completed", "error"]:
-                # Очищаем сессию через 5 секунд после завершения
-                time.sleep(5)
-                with session_lock:
-                    if session_id in processing_sessions:
-                        del processing_sessions[session_id]
-                break
-            
-            time.sleep(0.3)  # Обновление каждые 300мс
-    
-    return Response(
-        stream_with_context(generate()),
-        mimetype='text/event-stream',
-        headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',
-            'Connection': 'keep-alive'
-        }
+    # Start processing in background thread with file paths instead of file objects
+    thread = threading.Thread(
+        target=process_upload_async,
+        args=(log_queue, session_id, temp_files)
     )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'session_id': session_id})
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5555, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5555, debug=True)

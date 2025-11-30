@@ -1,4 +1,9 @@
-"""Конфигурация и константы приложения"""
+"""
+Получение OAuth-токена
 
-YANDEX_DISK_API_KEY = "_your_OAuth_token_here_"
-BASE_FOLDER_PATH = "Приложения/Блокнот картографа Народной карты"
+Для загрузки данных в Блокнот картографа на Яндекс Диск потребуется получить OAuth-токен
+тут https://yandex.ru/dev/disk/poligon/ и вставить вместо YOUR_YANDEX_DISK_API_KEY
+"""
+
+# YANDEX_DISK_API_KEY = "YOUR_YANDEX_DISK_API_KEY"
+YANDEX_DISK_API_KEY = "y0__xCG04IkGNuWAyDby7THExzFQIJhChaEP4AuVz5pqCI82CE3"
