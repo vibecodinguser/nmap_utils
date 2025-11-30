@@ -24,11 +24,11 @@
 
 ## 🖼️ Скриншоты
 
-<img src="https://github.com/user-attachments/assets/c00b5c4a-7a6d-49cc-af64-6747ec456868" align="center" width="400"/>
-<img src="https://github.com/user-attachments/assets/9b9e5425-d7d1-4caa-9389-0eb17fc20906" align="center" width="400"/>
+<img src="https://github.com/user-attachments/assets/4d22e5af-37e8-4915-8c05-e8fac9810ef8" align="center" width="400"/>
+<img src="https://github.com/user-attachments/assets/451f0a79-0a19-421d-910c-8fd6e76a3dea" align="center" width="400"/>
 <p></p>
-<img src="https://github.com/user-attachments/assets/b9fd4159-7832-4158-8f61-08242ea1bab9" align="center" width="400"/>
-<img src="https://github.com/user-attachments/assets/4710006b-ff0c-4e96-873c-9186c5d81ccf" align="center" width="400"/>
+<img src="https://github.com/user-attachments/assets/14460c5b-1deb-4efe-bdef-d3ba2fb1186d" align="center" width="400"/>
+<img src="https://github.com/user-attachments/assets/fa8975d5-c9eb-4ecd-a7c1-01fafb5591fa" align="center" width="400"/>
 
 ## 🛠 Технологический стек
 
