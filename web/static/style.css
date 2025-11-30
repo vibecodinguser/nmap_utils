@@ -1,0 +1,320 @@
+:root {
+    --primary-color: #FFDB4D;
+    --primary-hover: #FBCA04;
+    --text-color: #1F1F1F;
+    --text-secondary: #6B6B6B;
+    --bg-color: #F5F5F7;
+    --card-bg: #FFFFFF;
+    --border-color: #E5E5E5;
+    --success-color: #4BB34B;
+    --error-color: #FF3333;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 900px;
+    margin: 40px 20px;
+    background: var(--card-bg);
+    padding: 48px;
+    border-radius: 16px;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 48px;
+}
+
+h1 {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-color);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    font-weight: 400;
+    margin-top: 130px;
+}
+
+.upload-section {
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+.upload-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 750px;
+}
+
+.submit-btn {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    border: none;
+    padding: 16px 24px;
+    font-size: 0.95em;
+    font-weight: 500;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(255, 219, 77, 0.2);
+}
+
+.submit-btn:hover {
+    background-color: var(--primary-hover);
+    box-shadow: 0 4px 12px rgba(255, 219, 77, 0.3);
+    transform: translateY(-1px);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(255, 219, 77, 0.2);
+}
+
+.tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 14px 28px;
+    font-size: 1em;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text-color);
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.tab-btn.active {
+    color: var(--text-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.alert {
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    font-weight: 500;
+}
+
+.alert-error {
+    background-color: #FFF5F5;
+    color: var(--error-color);
+    border: 1px solid #FFE0E0;
+}
+
+.results-section {
+    margin-top: 40px;
+}
+
+h2 {
+    font-size: 1.3em;
+    margin-bottom: 20px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.results-table th,
+.results-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.results-table th {
+    font-weight: 600;
+    color: var(--text-color);
+    background-color: #FAFAFA;
+}
+
+.results-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.results-table tbody tr:hover {
+    background-color: #FAFAFA;
+}
+
+.error-table td:last-child {
+    color: var(--error-color);
+}
+
+.empty-message {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 48px 24px;
+    font-style: italic;
+    font-size: 1em;
+}
+
+/* Terminal Section Styling */
+.terminal-section {
+    margin-top: 40px;
+    font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.8em;
+}
+
+.terminal-header {
+    font-size: 1.3em;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.terminal {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 24px;
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.6;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.terminal-line {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: baseline;
+}
+
+.terminal-line:last-child {
+    margin-bottom: 0;
+}
+
+.terminal-prompt {
+    color: #4EC9B0;
+    font-weight: bold;
+    user-select: none;
+}
+
+.terminal-time {
+    color: #858585;
+    font-size: 0.85em;
+    min-width: 90px;
+    user-select: none;
+}
+
+.terminal-text {
+    color: #D4D4D4;
+    flex: 1;
+    word-wrap: break-word;
+}
+
+/* Terminal log level colors */
+.terminal-info .terminal-text {
+    color: #D4D4D4;
+}
+
+.terminal-success .terminal-text,
+.terminal-info .terminal-text:contains("✓") {
+    color: #4EC9B0;
+}
+
+.terminal-error .terminal-text {
+    color: #F48771;
+    font-weight: 500;
+}
+
+.terminal-warning .terminal-text {
+    color: #DCDCAA;
+}
+
+/* Scrollbar styling for terminal */
+.terminal::-webkit-scrollbar {
+    width: 10px;
+}
+
+.terminal::-webkit-scrollbar-track {
+    background: #252525;
+    border-radius: 4px;
+}
+
+.terminal::-webkit-scrollbar-thumb {
+    background: #464646;
+    border-radius: 4px;
+}
+
+.terminal::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .button-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .container {
+        padding: 32px 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .button-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .submit-btn {
+        font-size: 0.9em;
+    }
+}

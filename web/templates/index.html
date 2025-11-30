@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nmap_utils</title>
+    <link rel="icon" type="image/svg+xml" href="https://n.maps.yandex.ru/favicon-dot.svg">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <a href="https://n.maps.yandex.ru/#!" target="_blank" rel="noopener noreferrer">
+                <svg height="72" width="284" xmlns="http://www.w3.org/2000/svg" fill="black">
+                    <path
+                        d="m71 36h3.18c1.129 0 2.004.236 2.624.708.63.463.944 1.19.944 2.18 0 .565-.093 1.051-.278 1.458-.176.398-.426.727-.75.986-.324.259-.713.449-1.166.569-.444.12-.94.18-1.486.18h-1.763v3.874h-1.305zm1.305 1.194v3.707h1.763c.352 0 .671-.037.958-.111.287-.074.532-.19.736-.347.213-.157.375-.361.486-.611.12-.259.18-.569.18-.93 0-.602-.194-1.037-.583-1.305-.389-.269-.944-.403-1.666-.403z" />
+                    <path
+                        d="m84.771 45.345c-.102.074-.227.153-.375.236-.148.083-.329.167-.542.25-.213.074-.454.134-.722.18-.268.056-.569.084-.903.084-1.212 0-2.133-.329-2.763-.986-.629-.657-.944-1.578-.944-2.763 0-.583.083-1.106.25-1.569.176-.463.417-.852.722-1.166.305-.324.666-.569 1.083-.736.417-.176.87-.264 1.361-.264.518 0 .981.088 1.388.264.407.176.741.435 1 .777.268.343.449.768.541 1.277.102.5.102 1.083 0 1.75h-5.082c.046.777.278 1.36.694 1.749.417.38 1.037.57 1.861.57.555 0 1.032-.079 1.43-.236.398-.157.731-.329.999-.514zm-2.86-5.651c-.528 0-.981.162-1.361.486-.38.324-.62.815-.722 1.472h3.874c.037-.667-.116-1.157-.458-1.472-.343-.324-.787-.486-1.333-.486z" />
+                    <path
+                        d="m86.119 44.914c.259-.157.463-.403.611-.736.148-.333.264-.754.347-1.264.083-.509.139-1.11.167-1.805.037-.694.069-1.481.097-2.36h4.957v6.165h1.083v3.096h-1.069l-.153-2.055h-5.359l-.125 2.055h-1.097v-3.096zm4.957 0v-5.123h-2.638c-.046 1.36-.134 2.453-.264 3.277-.12.814-.333 1.43-.638 1.847z" />
+                    <path
+                        d="m98.81 44.581c-.083.167-.19.343-.319.528-.13.176-.292.338-.486.486-.195.148-.426.268-.694.361-.259.093-.565.139-.916.139-.648 0-1.171-.181-1.569-.542-.398-.37-.597-.898-.597-1.583 0-.787.273-1.365.819-1.736.555-.37 1.342-.555 2.36-.555h1.347v-.597c0-.5-.13-.856-.389-1.069-.259-.213-.703-.319-1.333-.319-.444 0-.865.074-1.263.222-.398.139-.755.301-1.069.486v-1.097c.259-.157.606-.31 1.041-.458.444-.157.93-.236 1.458-.236.907 0 1.597.19 2.069.569.472.37.708.949.708 1.736v3.874l.027.292c.01.101.015.208.015.319.009.111.018.218.027.319.01.093.019.172.028.236h-1.11c-.028-.13-.056-.31-.084-.541-.018-.241-.028-.449-.028-.625zm-2.152.417c.38 0 .704-.079.972-.236.269-.157.486-.338.653-.542.167-.212.287-.416.361-.61.074-.204.111-.348.111-.431v-.528h-1.222c-.731 0-1.263.106-1.597.319-.324.204-.486.514-.486.93 0 .324.098.588.292.792s.5.305.916.305z" />
+                    <path
+                        d="m103.759 42.887h-.639v3.068h-1.222v-7.206h1.222v3.096h.694l2.527-3.096h1.389l-2.958 3.555 3.013 3.651h-1.486z" />
+                    <path d="m111.973 39.791v6.165h-1.222v-6.165h-2.263v-1.041h5.79v1.041z" />
+                    <path
+                        d="m118.442 46.094c-.491 0-.949-.083-1.375-.25-.425-.167-.796-.407-1.11-.722-.306-.324-.547-.717-.722-1.18-.176-.463-.264-.995-.264-1.597 0-.592.088-1.12.264-1.583.175-.472.416-.865.722-1.18.314-.315.685-.555 1.11-.722.426-.166.884-.25 1.375-.25.5 0 .963.083 1.388.25.426.166.792.407 1.097.722.315.315.56.708.736 1.18.185.463.278.99.278 1.583 0 .601-.093 1.134-.278 1.597-.176.463-.421.856-.736 1.18-.305.315-.671.555-1.097.722-.425.167-.888.25-1.388.25zm0-1.097c.324 0 .62-.051.889-.153.277-.111.518-.273.722-.486.203-.222.361-.5.472-.833.111-.333.166-.727.166-1.18 0-.454-.055-.847-.166-1.18-.111-.333-.269-.606-.472-.819-.204-.222-.445-.384-.722-.486-.269-.111-.565-.167-.889-.167s-.62.056-.889.167c-.268.102-.504.268-.708.486-.194.213-.347.486-.458.819-.111.333-.167.727-.167 1.18 0 .454.056.848.167 1.18.111.333.264.611.458.833.204.213.44.375.708.486.269.102.565.153.889.153z" />
+                    <path
+                        d="m127.054 46.094c-.555 0-1.037-.13-1.444-.389-.398-.259-.717-.615-.958-1.069v3.777h-1.222v-9.664h1.069l.125 1.402c.241-.472.565-.847.972-1.125.408-.277.912-.416 1.514-.416.416 0 .814.079 1.194.236.389.148.726.38 1.013.694.297.306.528.694.695 1.166.176.463.263 1.009.263 1.639 0 .638-.087 1.194-.263 1.666-.176.463-.412.852-.708 1.166-.297.306-.639.537-1.028.695-.389.148-.796.222-1.222.222zm-.18-1.097c.638 0 1.152-.218 1.541-.653.398-.444.597-1.111.597-1.999 0-.87-.199-1.527-.597-1.972-.389-.453-.903-.68-1.541-.68-.315 0-.611.055-.889.166-.268.111-.504.278-.708.5-.194.213-.352.486-.472.819-.111.333-.167.722-.167 1.166 0 .444.056.833.167 1.166.12.333.278.611.472.833.204.222.44.389.708.5.278.101.574.152.889.152z" />
+                    <path
+                        d="m134.904 38.971c0-.528.088-.977.264-1.347.175-.38.421-.69.736-.93.323-.241.708-.417 1.152-.528.444-.111.935-.167 1.472-.167h3.096v9.955h-1.319v-3.985h-1.805l-2.749 3.985h-1.597l3.013-4.221c-.731-.157-1.291-.458-1.68-.902-.389-.454-.583-1.074-.583-1.861zm5.401 1.819v-3.596h-1.777c-.333 0-.639.032-.917.097-.268.056-.504.153-.708.292-.194.138-.347.323-.458.555-.111.222-.167.5-.167.833 0 .629.181 1.092.542 1.388.361.287.884.431 1.569.431z" />
+                    <path d="m148.49 42.762h-3.485v3.193h-1.222v-7.206h1.222v2.971h3.485v-2.971h1.222v7.206h-1.222z" />
+                    <path
+                        d="m151.326 44.914c.26-.157.463-.403.611-.736.148-.333.264-.754.347-1.264.084-.509.139-1.11.167-1.805.037-.694.069-1.481.097-2.36h4.957v6.165h1.083v3.096h-1.069l-.153-2.055h-5.359l-.125 2.055h-1.097v-3.096zm4.957 0v-5.123h-2.638c-.046 1.36-.134 2.453-.264 3.277-.12.814-.333 1.43-.638 1.847z" />
+                    <path
+                        d="m165.463 45.345c-.102.074-.227.153-.375.236-.148.083-.328.167-.541.25-.213.074-.454.134-.722.18-.269.056-.569.084-.903.084-1.212 0-2.133-.329-2.763-.986-.629-.657-.944-1.578-.944-2.763 0-.583.083-1.106.25-1.569.176-.463.417-.852.722-1.166.305-.324.666-.569 1.083-.736.417-.176.87-.264 1.361-.264.518 0 .981.088 1.388.264.407.176.741.435 1 .777.268.343.449.768.541 1.277.102.5.102 1.083 0 1.75h-5.081c.046.777.277 1.36.694 1.749.416.38 1.037.57 1.86.57.556 0 1.032-.079 1.43-.236.399-.157.732-.329 1-.514zm-2.86-5.651c-.528 0-.981.162-1.361.486-.379.324-.62.815-.722 1.472h3.874c.037-.667-.116-1.157-.458-1.472-.343-.324-.787-.486-1.333-.486z" />
+                    <path
+                        d="m169.061 42.887h-.639v3.068h-1.222v-7.206h1.222v3.096h.694l2.527-3.096h1.389l-2.958 3.555 3.013 3.651h-1.486z" />
+                    <path
+                        d="m177.212 46.094c-.555 0-1.06-.083-1.514-.25-.444-.176-.823-.421-1.138-.736-.315-.324-.555-.717-.722-1.18-.167-.463-.25-.99-.25-1.583 0-.583.083-1.106.25-1.569.176-.463.421-.852.736-1.166.315-.324.699-.569 1.152-.736.454-.176.968-.264 1.541-.264.445 0 .852.051 1.222.153.371.092.676.231.917.416v1.097c-.296-.194-.63-.338-1-.43-.361-.102-.736-.153-1.125-.153-.842 0-1.462.217-1.86.652-.389.435-.583 1.102-.583 2 0 .898.189 1.564.569 1.999.379.435.981.653 1.805.653.435 0 .833-.051 1.194-.153.37-.111.704-.25 1-.416v1.097c-.259.157-.574.291-.944.402-.361.111-.778.167-1.25.167z" />
+                    <path
+                        d="m181.561 46.039c-.268 0-.486-.083-.652-.25-.167-.176-.25-.384-.25-.625 0-.259.083-.472.25-.638.166-.167.384-.25.652-.25.26 0 .473.083.639.25.167.166.25.379.25.638 0 .241-.083.449-.25.625-.166.167-.379.25-.639.25z" />
+                    <path
+                        d="m186.744 41.693h-1.055v4.263h-1.305v-9.955h1.305v4.513h.972l3.554-4.513h1.472l-3.929 4.971 4.082 4.985h-1.625z" />
+                    <path
+                        d="m197.13 44.581c-.084.167-.19.343-.32.528-.129.176-.291.338-.486.486-.194.148-.426.268-.694.361-.259.093-.565.139-.916.139-.648 0-1.171-.181-1.569-.542-.398-.37-.597-.898-.597-1.583 0-.787.273-1.365.819-1.736.555-.37 1.342-.555 2.36-.555h1.347v-.597c0-.5-.13-.856-.389-1.069-.259-.213-.703-.319-1.333-.319-.444 0-.865.074-1.263.222-.398.139-.755.301-1.069.486v-1.097c.259-.157.606-.31 1.041-.458.444-.157.93-.236 1.458-.236.907 0 1.597.19 2.069.569.472.37.708.949.708 1.736v3.874l.027.292c.01.101.015.208.015.319.009.111.018.218.027.319.01.093.019.172.028.236h-1.11c-.028-.13-.056-.31-.084-.541-.018-.241-.028-.449-.028-.625zm-2.153.417c.38 0 .704-.079.972-.236.269-.157.486-.338.653-.542.167-.212.287-.416.361-.61.074-.204.111-.348.111-.431v-.528h-1.222c-.731 0-1.263.106-1.597.319-.324.204-.486.514-.486.93 0 .324.098.588.292.792s.5.305.916.305z" />
+                    <path
+                        d="m203.841 46.094c-.555 0-1.037-.13-1.444-.389-.398-.259-.717-.615-.958-1.069v3.777h-1.222v-9.664h1.069l.125 1.402c.241-.472.565-.847.972-1.125.408-.277.912-.416 1.514-.416.416 0 .814.079 1.194.236.388.148.726.38 1.013.694.296.306.528.694.695 1.166.175.463.263 1.009.263 1.639 0 .638-.088 1.194-.263 1.666-.176.463-.412.852-.709 1.166-.296.306-.638.537-1.027.695-.389.148-.796.222-1.222.222zm-.18-1.097c.638 0 1.152-.218 1.541-.653.398-.444.597-1.111.597-1.999 0-.87-.199-1.527-.597-1.972-.389-.453-.903-.68-1.541-.68-.315 0-.611.055-.889.166-.269.111-.505.278-.708.5-.195.213-.352.486-.472.819-.111.333-.167.722-.167 1.166 0 .444.056.833.167 1.166.12.333.277.611.472.833.203.222.439.389.708.5.278.101.574.152.889.152z" />
+                    <path d="m211.309 39.791v6.165h-1.222v-6.165h-2.263v-1.041h5.79v1.041z" />
+                    <path d="m49.45.845v20.155h3.509v-8.758h6.554v8.758h3.509V.845h-3.509v8.671h-6.554V.845z" />
+                    <path
+                        d="m76.836 11.053c0-3.538-1.798-4.872-5.452-4.872-2.291 0-4.089.725-5.133 1.334v2.871c.928-.696 2.958-1.45 4.727-1.45 1.653 0 2.407.58 2.407 2.146v.812h-.551c-5.278 0-7.627 1.74-7.627 4.698s1.798 4.611 4.466 4.611c2.03 0 2.9-.667 3.567-1.363h.145c.029.377.145.87.261 1.16h3.364c-.116-1.189-.174-2.378-.174-3.567zm-3.451 6.467c-.435.638-1.247 1.16-2.465 1.16-1.45 0-2.175-.87-2.175-2.175 0-1.711 1.189-2.32 4.147-2.32h.493z" />
+                    <path
+                        d="m82.801 6.413h-3.19v18.792h3.451v-5.916c.87 1.305 2.146 2.001 3.625 2.001 3.364 0 5.684-2.697 5.684-7.598 0-4.872-2.262-7.569-5.51-7.569-1.624 0-2.958.754-3.886 2.175zm3.016 12.151c-1.827 0-2.755-1.479-2.755-4.843 0-3.393.986-4.872 2.929-4.872 1.885 0 2.813 1.479 2.813 4.843 0 3.393-.986 4.872-2.987 4.872z" />
+                    <path
+                        d="m100.535 6.123c-3.799 0-6.438 2.697-6.438 7.598 0 4.872 2.639 7.569 6.438 7.569 3.798 0 6.437-2.697 6.437-7.598 0-4.872-2.639-7.569-6.437-7.569zm0 12.441c-1.914 0-2.871-1.479-2.871-4.843 0-3.393.957-4.872 2.871-4.872 1.913 0 2.87 1.479 2.87 4.843 0 3.393-.957 4.872-2.87 4.872z" />
+                    <path
+                        d="m121.627 18.274h-1.537v-11.861h-10.063v1.247c0 3.567-.232 8.178-1.45 10.614h-1.073v6.061h3.19v-3.335h7.743v3.335h3.19zm-4.988 0h-4.872c.957-2.204 1.218-6.177 1.218-8.7v-.435h3.654z" />
+                    <path d="m131.513 6.413v5.771h-4.611v-5.771h-3.451v14.587h3.451v-6.09h4.611v6.09h3.451V6.413z" />
+                    <path
+                        d="m148.77 11.053c0-3.538-1.798-4.872-5.452-4.872-2.291 0-4.089.725-5.133 1.334v2.871c.928-.696 2.958-1.45 4.727-1.45 1.653 0 2.407.58 2.407 2.146v.812h-.551c-5.278 0-7.627 1.74-7.627 4.698s1.798 4.611 4.466 4.611c2.03 0 2.9-.667 3.567-1.363h.145c.029.377.145.87.261 1.16h3.364c-.116-1.189-.174-2.378-.174-3.567zm-3.451 6.467c-.435.638-1.247 1.16-2.465 1.16-1.45 0-2.175-.87-2.175-2.175 0-1.711 1.189-2.32 4.147-2.32h.493z" />
+                    <path
+                        d="m150.53 21h3.538l2.784-4.756h1.653v4.756h3.451V6.413h-5.278c-3.364 0-5.771 1.711-5.771 4.843 0 2.204 1.044 3.596 2.9 4.234zm6.409-11.861h1.566v4.582h-1.653c-1.566 0-2.436-.667-2.436-2.349 0-1.595 1.015-2.233 2.523-2.233z" />
+                    <path
+                        d="m179.216 21h3.915l-5.539-7.859 4.872-6.728h-3.48l-4.872 6.728V6.413h-3.451v14.587h3.451v-7.163z" />
+                    <path
+                        d="m194.875 11.053c0-3.538-1.798-4.872-5.452-4.872-2.291 0-4.089.725-5.133 1.334v2.871c.928-.696 2.958-1.45 4.727-1.45 1.653 0 2.407.58 2.407 2.146v.812h-.551c-5.278 0-7.627 1.74-7.627 4.698s1.798 4.611 4.466 4.611c2.03 0 2.9-.667 3.567-1.363h.145c.029.377.145.87.261 1.16h3.364c-.116-1.189-.174-2.378-.174-3.567zm-3.451 6.467c-.435.638-1.247 1.16-2.465 1.16-1.45 0-2.175-.87-2.175-2.175 0-1.711 1.189-2.32 4.147-2.32h.493z" />
+                    <path
+                        d="m200.84 6.413h-3.19v18.792h3.451v-5.916c.87 1.305 2.146 2.001 3.625 2.001 3.364 0 5.684-2.697 5.684-7.598 0-4.872-2.262-7.569-5.51-7.569-1.624 0-2.958.754-3.886 2.175zm3.016 12.151c-1.827 0-2.755-1.479-2.755-4.843 0-3.393.986-4.872 2.929-4.872 1.885 0 2.813 1.479 2.813 4.843 0 3.393-.986 4.872-2.987 4.872z" />
+                    <path d="m222.54 9.139v-2.726h-11.571v2.726h4.06v11.861h3.451V9.139z" />
+                    <path
+                        d="m234.609 11.053c0-3.538-1.798-4.872-5.452-4.872-2.291 0-4.089.725-5.133 1.334v2.871c.928-.696 2.958-1.45 4.727-1.45 1.653 0 2.407.58 2.407 2.146v.812h-.551c-5.278 0-7.627 1.74-7.627 4.698s1.798 4.611 4.466 4.611c2.03 0 2.9-.667 3.567-1.363h.145c.029.377.145.87.261 1.16h3.364c-.116-1.189-.174-2.378-.174-3.567zm-3.451 6.467c-.435.638-1.247 1.16-2.465 1.16-1.45 0-2.175-.87-2.175-2.175 0-1.711 1.189-2.32 4.147-2.32h.493z" />
+                </svg>
+            </a>
+            <p class="subtitle">Поддерживаемые форматы nmap_utils</p>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <form action="/" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+                    <input type="file" name="files" id="files_shp" accept=".zip" multiple style="display: none;">
+                    <input type="file" name="files" id="files_gpx" accept=".gpx" multiple style="display: none;">
+                    <input type="file" name="files" id="files_kml" accept=".kml,.kmz" multiple style="display: none;">
+                    <input type="file" name="files" id="files_geojson" accept=".geojson" multiple
+                        style="display: none;">
+                    <input type="file" name="files" id="files_topojson" accept=".topojson" multiple
+                        style="display: none;">
+                    <input type="file" name="files" id="files_wkt" accept=".wkt" multiple style="display: none;">
+                    <div class="button-grid">
+                        <button type="button" class="submit-btn" id="uploadBtn">Загрузить SHP</button>
+                        <button type="button" class="submit-btn" id="uploadBtnGpx">Загрузить GPX</button>
+                        <button type="button" class="submit-btn" id="uploadBtnKml">Загрузить KML/KMZ</button>
+                        <button type="button" class="submit-btn" id="uploadBtnGeojson">Загрузить GeoJSON</button>
+                        <button type="button" class="submit-btn" id="uploadBtnTopojson">Загрузить TopoJSON</button>
+                        <button type="button" class="submit-btn" id="uploadBtnWkt">Загрузить WKT</button>
+                    </div>
+                </form>
+            </section>
+
+            {% if error %}
+            <div class="alert alert-error">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            {% if processed or skipped %}
+            <section class="results-section">
+                <div class="tabs">
+                    <button class="tab-btn {% if processed %}active{% endif %}" data-tab="processed">Загружено</button>
+                    <button class="tab-btn {% if not processed and skipped %}active{% endif %}"
+                        data-tab="skipped">Пропущено
+                    </button>
+                </div>
+
+                <div class="tab-content {% if processed %}active{% endif %}" id="processed-tab">
+                    {% if processed %}
+                    <div class="table-wrapper">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Файл</th>
+                                    <th>Описание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in processed %}
+                                <tr>
+                                    <td>{{ item.name }}</td>
+                                    <td>{{ item.desc }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="empty-message">Нет загруженных файлов</p>
+                    {% endif %}
+                </div>
+
+                <div class="tab-content {% if not processed and skipped %}active{% endif %}" id="skipped-tab">
+                    {% if skipped %}
+                    <div class="table-wrapper">
+                        <table class="results-table error-table">
+                            <thead>
+                                <tr>
+                                    <th>Файл</th>
+                                    <th>Причина</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in skipped %}
+                                <tr>
+                                    <td>{{ item.name }}</td>
+                                    <td>{{ item.reason }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="empty-message">Нет пропущенных файлов</p>
+                    {% endif %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if logs %}
+            <section class="terminal-section">
+                <div class="terminal">
+                    {% for log in logs %}
+                    <div class="terminal-line terminal-{{ log.level }}">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-time">[{{ log.time }}]</span>
+                        <span class="terminal-text">{{ log.message }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        const fileInputShp = document.getElementById('files_shp');
+        const fileInputGeojson = document.getElementById('files_geojson');
+        const fileInputGpx = document.getElementById('files_gpx');
+        const fileInputKml = document.getElementById('files_kml');
+        const fileInputTopojson = document.getElementById('files_topojson');
+        const fileInputWkt = document.getElementById('files_wkt');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadBtnGeojson = document.getElementById('uploadBtnGeojson');
+        const uploadBtnGpx = document.getElementById('uploadBtnGpx');
+        const uploadBtnKml = document.getElementById('uploadBtnKml');
+        const uploadBtnTopojson = document.getElementById('uploadBtnTopojson');
+        const uploadBtnWkt = document.getElementById('uploadBtnWkt');
+
+        // Handle file upload with real-time logs
+        function handleFileUpload(files) {
+            if (files.length === 0) return;
+
+            // Show terminal section
+            const terminalSection = document.createElement('section');
+            terminalSection.className = 'terminal-section';
+            terminalSection.innerHTML = `
+            <div class="terminal" id="realtime-terminal"></div>
+        `;
+
+            // Remove existing terminal if any
+            const existing = document.querySelector('.terminal-section');
+            if (existing) existing.remove();
+
+            // Add after main section
+            document.querySelector('main').appendChild(terminalSection);
+
+            const terminal = document.getElementById('realtime-terminal');
+
+            // Create FormData
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            // Upload files and get session ID
+            fetch('/upload-async', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const sessionId = data.session_id;
+
+                    // Connect to SSE stream
+                    const eventSource = new EventSource(`/stream-logs/${sessionId}`);
+
+                    eventSource.onmessage = function (event) {
+                        const logEntry = JSON.parse(event.data);
+
+                        // Create log line
+                        const logLine = document.createElement('div');
+                        logLine.className = `terminal-line terminal-${logEntry.level}`;
+                        logLine.innerHTML = `
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-time">[${logEntry.time}]</span>
+                    <span class="terminal-text">${logEntry.message}</span>
+                `;
+
+                        terminal.appendChild(logLine);
+
+                        // Auto-scroll to bottom
+                        terminal.scrollTop = terminal.scrollHeight;
+                    };
+
+                    eventSource.onerror = function () {
+                        eventSource.close();
+
+                        // Add completion message
+                        const completeLine = document.createElement('div');
+                        completeLine.className = 'terminal-line terminal-info';
+                        completeLine.innerHTML = `
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-time">[${new Date().toTimeString().slice(0, 8)}]</span>
+                    <span class="terminal-text">Процесс завершен...</span>
+                `;
+                        terminal.appendChild(completeLine);
+                    };
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                    const errorLine = document.createElement('div');
+                    errorLine.className = 'terminal-line terminal-error';
+                    errorLine.innerHTML = `
+                <span class="terminal-prompt">$</span>
+                <span class="terminal-time">[${new Date().toTimeString().slice(0, 8)}]</span>
+                <span class="terminal-text">Error: ${error.message}</span>
+            `;
+                    terminal.appendChild(errorLine);
+                });
+        }
+
+        uploadBtn.addEventListener('click', () => {
+            fileInputShp.click();
+        });
+
+        uploadBtnGeojson.addEventListener('click', () => {
+            fileInputGeojson.click();
+        });
+
+        uploadBtnGpx.addEventListener('click', () => {
+            fileInputGpx.click();
+        });
+
+        uploadBtnKml.addEventListener('click', () => {
+            fileInputKml.click();
+        });
+
+        uploadBtnTopojson.addEventListener('click', () => {
+            fileInputTopojson.click();
+        });
+
+        uploadBtnWkt.addEventListener('click', () => {
+            fileInputWkt.click();
+        });
+
+        fileInputShp.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        fileInputGeojson.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        fileInputGpx.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        fileInputKml.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        fileInputTopojson.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        fileInputWkt.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.getAttribute('data-tab');
+
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                document.getElementById(tabName + '-tab').classList.add('active');
+            });
+        });
+    </script>
+</body>
+
+</html>
