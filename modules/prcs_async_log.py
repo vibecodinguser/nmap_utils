@@ -112,7 +112,7 @@ def process_upload_async(log_queue: Queue, session_id: str, temp_files: List[Tup
         try:
             _ensure_storage_folders()
         except ProcessingError as e:
-            logger.error(f"Ошибка Яндекс.Диска: {e.message}")
+            logger.error(f"Добавьте свой OAuth-токен Яндекс.Диска в config.py")
             return
 
         try:
