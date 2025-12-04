@@ -91,6 +91,15 @@
                     <input type="file" name="files" id="files_topojson" accept=".topojson" multiple
                         style="display: none;">
                     <input type="file" name="files" id="files_wkt" accept=".wkt" multiple style="display: none;">
+                    <input type="file" name="files" id="files_wkt" accept=".wkt" multiple style="display: none;">
+
+                    <div class="nspd-container" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                        <input type="text" id="nspd_registry_number"
+                            placeholder="Реестровый номер (например, 77:01:0002009:2525)"
+                            style="flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        <button type="button" class="submit-btn" id="uploadBtnNspd">Загрузить из НСПД</button>
+                    </div>
+
                     <div class="button-grid">
                         <button type="button" class="submit-btn" id="uploadBtn">Загрузить SHP</button>
                         <button type="button" class="submit-btn" id="uploadBtnGpx">Загрузить GPX</button>
@@ -198,6 +207,95 @@
         const uploadBtnKml = document.getElementById('uploadBtnKml');
         const uploadBtnTopojson = document.getElementById('uploadBtnTopojson');
         const uploadBtnWkt = document.getElementById('uploadBtnWkt');
+        const uploadBtnNspd = document.getElementById('uploadBtnNspd');
+        const nspdInput = document.getElementById('nspd_registry_number');
+
+        function handleNspdUpload(registryNumber) {
+            // Show terminal section
+            const terminalSection = document.createElement('section');
+            terminalSection.className = 'terminal-section';
+            terminalSection.innerHTML = `
+            <div class="terminal" id="realtime-terminal"></div>
+        `;
+
+            // Remove existing terminal if any
+            const existing = document.querySelector('.terminal-section');
+            if (existing) existing.remove();
+
+            // Add after main section
+            document.querySelector('main').appendChild(terminalSection);
+
+            const terminal = document.getElementById('realtime-terminal');
+
+            // Create FormData
+            const formData = new FormData();
+            formData.append('registry_number', registryNumber);
+
+            // Upload files and get session ID
+            fetch('/upload-nspd-async', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const sessionId = data.session_id;
+
+                    // Connect to SSE stream
+                    const eventSource = new EventSource(`/stream-logs/${sessionId}`);
+
+                    eventSource.onmessage = function (event) {
+                        const logEntry = JSON.parse(event.data);
+
+                        // Create log line
+                        const logLine = document.createElement('div');
+                        logLine.className = `terminal-line terminal-${logEntry.level}`;
+                        logLine.innerHTML = `
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-time">[${logEntry.time}]</span>
+                    <span class="terminal-text">${logEntry.message}</span>
+                `;
+
+                        terminal.appendChild(logLine);
+
+                        // Auto-scroll to bottom
+                        terminal.scrollTop = terminal.scrollHeight;
+                    };
+
+                    eventSource.onerror = function () {
+                        eventSource.close();
+
+                        // Add completion message
+                        const completeLine = document.createElement('div');
+                        completeLine.className = 'terminal-line terminal-info';
+                        completeLine.innerHTML = `
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-time">[${new Date().toTimeString().slice(0, 8)}]</span>
+                    <span class="terminal-text">Процесс завершен...</span>
+                `;
+                        terminal.appendChild(completeLine);
+                    };
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                    const errorLine = document.createElement('div');
+                    errorLine.className = 'terminal-line terminal-error';
+                    errorLine.innerHTML = `
+                <span class="terminal-prompt">$</span>
+                <span class="terminal-time">[${new Date().toTimeString().slice(0, 8)}]</span>
+                <span class="terminal-text">Error: ${error.message}</span>
+            `;
+                    terminal.appendChild(errorLine);
+                });
+        }
+
+        uploadBtnNspd.addEventListener('click', () => {
+            const val = nspdInput.value.trim();
+            if (val) {
+                handleNspdUpload(val);
+            } else {
+                alert("Введите реестровый номер");
+            }
+        });
 
         // Handle file upload with real-time logs
         function handleFileUpload(files) {

@@ -13,7 +13,7 @@ from modules.prcs_kml import process_kml
 from modules.prcs_topojson import process_topojson
 from modules.prcs_wkt import process_wkt
 from modules.prcs_upload import download_index_json, upload_index_json, ensure_folder, get_current_day_folder_path, BASE_FOLDER_PATH
-from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file
+from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file, process_nspd_async
 
 app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
 
@@ -181,6 +181,27 @@ def upload_async():
     thread = threading.Thread(
         target=process_upload_async,
         args=(log_queue, session_id, temp_files)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'session_id': session_id})
+
+
+@app.route('/upload-nspd-async', methods=['POST'])
+def upload_nspd_async():
+    """Async upload endpoint for NSPD registry number processing"""
+    
+    session_id = str(uuid.uuid4())
+    log_queue = Queue()
+    log_queues[session_id] = log_queue
+    
+    registry_number = request.form.get('registry_number')
+    
+    # Start processing in background thread
+    thread = threading.Thread(
+        target=process_nspd_async,
+        args=(log_queue, session_id, registry_number)
     )
     thread.daemon = True
     thread.start()
