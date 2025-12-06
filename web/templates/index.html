@@ -77,11 +77,19 @@
                         d="m234.609 11.053c0-3.538-1.798-4.872-5.452-4.872-2.291 0-4.089.725-5.133 1.334v2.871c.928-.696 2.958-1.45 4.727-1.45 1.653 0 2.407.58 2.407 2.146v.812h-.551c-5.278 0-7.627 1.74-7.627 4.698s1.798 4.611 4.466 4.611c2.03 0 2.9-.667 3.567-1.363h.145c.029.377.145.87.261 1.16h3.364c-.116-1.189-.174-2.378-.174-3.567zm-3.451 6.467c-.435.638-1.247 1.16-2.465 1.16-1.45 0-2.175-.87-2.175-2.175 0-1.711 1.189-2.32 4.147-2.32h.493z" />
                 </svg>
             </a>
-            <p class="subtitle">Поддерживаемые форматы nmap_utils</p>
+
         </header>
 
         <main>
             <section class="upload-section">
+                <!-- Upload Source Tabs -->
+                <div class="tabs upload-tabs">
+                    <button type="button" class="tab-btn active" data-tab="own-sources"
+                        data-group="upload-tabs">Собственные источники</button>
+                    <button type="button" class="tab-btn" data-tab="official-sources"
+                        data-group="upload-tabs">Официальные источники данных и GIS</button>
+                </div>
+
                 <form action="/" method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
                     <input type="file" name="files" id="files_shp" accept=".zip" multiple style="display: none;">
                     <input type="file" name="files" id="files_gpx" accept=".gpx" multiple style="display: none;">
@@ -91,22 +99,31 @@
                     <input type="file" name="files" id="files_topojson" accept=".topojson" multiple
                         style="display: none;">
                     <input type="file" name="files" id="files_wkt" accept=".wkt" multiple style="display: none;">
-                    <input type="file" name="files" id="files_wkt" accept=".wkt" multiple style="display: none;">
 
-                    <div class="nspd-container" style="margin-bottom: 20px; display: flex; gap: 10px;">
-                        <input type="text" id="nspd_registry_number"
-                            placeholder="Реестровый номер (например, 77:01:0002009:2525)"
-                            style="flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
-                        <button type="button" class="submit-btn" id="uploadBtnNspd">Загрузить из НСПД</button>
+                    <!-- Tab Content: Own Sources -->
+                    <div class="tab-content active" id="own-sources-tab" data-group="upload-tabs">
+                        <div class="button-grid">
+                            <button type="button" class="submit-btn" id="uploadBtn">Загрузить SHP</button>
+                            <button type="button" class="submit-btn" id="uploadBtnGpx">Загрузить GPX</button>
+                            <button type="button" class="submit-btn" id="uploadBtnKml">Загрузить KML/KMZ</button>
+                            <button type="button" class="submit-btn" id="uploadBtnGeojson">Загрузить GeoJSON</button>
+                            <button type="button" class="submit-btn" id="uploadBtnTopojson">Загрузить TopoJSON</button>
+                            <button type="button" class="submit-btn" id="uploadBtnWkt">Загрузить WKT</button>
+                        </div>
                     </div>
 
-                    <div class="button-grid">
-                        <button type="button" class="submit-btn" id="uploadBtn">Загрузить SHP</button>
-                        <button type="button" class="submit-btn" id="uploadBtnGpx">Загрузить GPX</button>
-                        <button type="button" class="submit-btn" id="uploadBtnKml">Загрузить KML/KMZ</button>
-                        <button type="button" class="submit-btn" id="uploadBtnGeojson">Загрузить GeoJSON</button>
-                        <button type="button" class="submit-btn" id="uploadBtnTopojson">Загрузить TopoJSON</button>
-                        <button type="button" class="submit-btn" id="uploadBtnWkt">Загрузить WKT</button>
+                    <!-- Tab Content: Official Sources -->
+                    <div class="tab-content" id="official-sources-tab" data-group="upload-tabs">
+                        <div class="nspd-container" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                            <input type="text" id="nspd_registry_number" placeholder="Реестровый номер (23:00-4.84)"
+                                style="width: 40%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                            <button type="button" class="submit-btn" id="uploadBtnNspd"
+                                style="width: 60%; white-space: nowrap;">Загрузить границы из НСПД</button>
+                        </div>
+                        <div class="button-grid">
+                            <button type="button" class="submit-btn" id="uploadBtnShpOfficial">Загрузить заповедники из
+                                ООПТ</button>
+                        </div>
                     </div>
                 </form>
             </section>
@@ -119,14 +136,16 @@
 
             {% if processed or skipped %}
             <section class="results-section">
-                <div class="tabs">
-                    <button class="tab-btn {% if processed %}active{% endif %}" data-tab="processed">Загружено</button>
-                    <button class="tab-btn {% if not processed and skipped %}active{% endif %}"
-                        data-tab="skipped">Пропущено
+                <div class="tabs results-tabs">
+                    <button class="tab-btn {% if processed %}active{% endif %}" data-tab="processed"
+                        data-group="results-tabs">Загружено</button>
+                    <button class="tab-btn {% if not processed and skipped %}active{% endif %}" data-tab="skipped"
+                        data-group="results-tabs">Пропущено
                     </button>
                 </div>
 
-                <div class="tab-content {% if processed %}active{% endif %}" id="processed-tab">
+                <div class="tab-content {% if processed %}active{% endif %}" id="processed-tab"
+                    data-group="results-tabs">
                     {% if processed %}
                     <div class="table-wrapper">
                         <table class="results-table">
@@ -151,7 +170,8 @@
                     {% endif %}
                 </div>
 
-                <div class="tab-content {% if not processed and skipped %}active{% endif %}" id="skipped-tab">
+                <div class="tab-content {% if not processed and skipped %}active{% endif %}" id="skipped-tab"
+                    data-group="results-tabs">
                     {% if skipped %}
                     <div class="table-wrapper">
                         <table class="results-table error-table">
@@ -208,6 +228,7 @@
         const uploadBtnTopojson = document.getElementById('uploadBtnTopojson');
         const uploadBtnWkt = document.getElementById('uploadBtnWkt');
         const uploadBtnNspd = document.getElementById('uploadBtnNspd');
+        const uploadBtnShpOfficial = document.getElementById('uploadBtnShpOfficial');
         const nspdInput = document.getElementById('nspd_registry_number');
 
         function handleNspdUpload(registryNumber) {
@@ -296,6 +317,12 @@
                 alert("Введите реестровый номер");
             }
         });
+
+        if (uploadBtnShpOfficial) {
+            uploadBtnShpOfficial.addEventListener('click', () => {
+                fileInputShp.click();
+            });
+        }
 
         // Handle file upload with real-time logs
         function handleFileUpload(files) {
@@ -440,18 +467,28 @@
             }
         });
 
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        const tabContents = document.querySelectorAll('.tab-content');
+        // Independent Tab Logic
+        const allTabBtns = document.querySelectorAll('.tab-btn');
 
-        tabBtns.forEach(btn => {
+        allTabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
-                const tabName = btn.getAttribute('data-tab');
+                const group = btn.getAttribute('data-group');
+                const tabId = btn.getAttribute('data-tab');
 
-                tabBtns.forEach(b => b.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
+                // Find all buttons and contents in this group
+                const groupBtns = document.querySelectorAll(`.tab-btn[data-group="${group}"]`);
+                const groupContents = document.querySelectorAll(`.tab-content[data-group="${group}"]`);
 
+                // Deactivate all in group
+                groupBtns.forEach(b => b.classList.remove('active'));
+                groupContents.forEach(c => c.classList.remove('active'));
+
+                // Activate clicked
                 btn.classList.add('active');
-                document.getElementById(tabName + '-tab').classList.add('active');
+                const content = document.getElementById(tabId + '-tab');
+                if (content) {
+                    content.classList.add('active');
+                }
             });
         });
     </script>

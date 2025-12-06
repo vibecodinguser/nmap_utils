@@ -12,8 +12,10 @@ from modules.prcs_gpx import process_gpx
 from modules.prcs_kml import process_kml
 from modules.prcs_topojson import process_topojson
 from modules.prcs_wkt import process_wkt
-from modules.prcs_upload import download_index_json, upload_index_json, ensure_folder, get_current_day_folder_path, BASE_FOLDER_PATH
-from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file, process_nspd_async
+from modules.prcs_upload import download_index_json, upload_index_json, ensure_folder, get_current_day_folder_path, \
+    BASE_FOLDER_PATH
+from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file, \
+    process_nspd_async
 
 app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
 
@@ -62,7 +64,7 @@ def index():
             try:
                 ensure_folder(BASE_FOLDER_PATH)
                 logger.info("✓ Базовая папка есть")
-                
+
                 logger.info("Проверка наличия папки для текущей даты")
                 ensure_folder(get_current_day_folder_path())
                 logger.info("✓ Папка для текущей даты есть")
@@ -159,14 +161,14 @@ def stream_logs(session_id):
 @app.route('/upload-async', methods=['POST'])
 def upload_async():
     """Async upload endpoint that processes files and streams logs"""
-    
+
     session_id = str(uuid.uuid4())
     log_queue = Queue()
     log_queues[session_id] = log_queue
-    
+
     uploaded_files = request.files.getlist('files')
     uploaded_files = [f for f in uploaded_files if f.filename != '']
-    
+
     # Save files to temp directory before background processing
     # File objects can't be used after request context ends
     temp_files = []
@@ -176,7 +178,7 @@ def upload_async():
             temp_path = os.path.join("/tmp", f"{session_id}_{filename}")
             file.save(temp_path)
             temp_files.append((temp_path, filename))
-    
+
     # Start processing in background thread with file paths instead of file objects
     thread = threading.Thread(
         target=process_upload_async,
@@ -184,20 +186,20 @@ def upload_async():
     )
     thread.daemon = True
     thread.start()
-    
+
     return jsonify({'session_id': session_id})
 
 
 @app.route('/upload-nspd-async', methods=['POST'])
 def upload_nspd_async():
     """Async upload endpoint for NSPD registry number processing"""
-    
+
     session_id = str(uuid.uuid4())
     log_queue = Queue()
     log_queues[session_id] = log_queue
-    
+
     registry_number = request.form.get('registry_number')
-    
+
     # Start processing in background thread
     thread = threading.Thread(
         target=process_nspd_async,
@@ -205,7 +207,7 @@ def upload_nspd_async():
     )
     thread.daemon = True
     thread.start()
-    
+
     return jsonify({'session_id': session_id})
 
 
