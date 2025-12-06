@@ -94,23 +94,24 @@
 ## 📂 Структура проекта
 
 ```
-gravity_map/
-├── app.py                  # Основной файл приложения Flask
-├── config.py               # Конфигурация OAuth-токена
-├── requirements.txt        # Зависимости проекта
-├── modules/                # Модули обработки данных
-│   ├── prcs_async_log.py   # Асинхронная обработка и логирование
-│   ├── prcs_flow.py        # Общая логика и утилиты
-│   ├── prcs_geojson.py     # Обработка формата GeoJSON
-│   ├── prcs_gpx.py         # Обработка формата GPX
-│   ├── prcs_kml.py         # Обработка формата KML/KMZ
-│   ├── prcs_shp.py         # Обработка формата Shapefile
-│   ├── prcs_topojson.py    # Обработка формата TopoJSON
-│   ├── prcs_wkt.py         # Обработка формата WKT
-│   └── prcs_upload.py      # Работа с API Яндекс.Диска
-├── static/                 # Статика для web (CSS, JS, Images)
-├── templates/              # HTML шаблоны
-└── tests/                  # Unit-тесты
+nmap_utils/
+├── app.py                      # Основной файл приложения Flask
+├── config.py                   # Конфигурация OAuth-токена
+├── requirements.txt            # Зависимости проекта
+├── modules/                    # Модули обработки данных
+│   ├── prcs_async_log.py       # Асинхронная обработка и логирование
+│   ├── prcs_flow.py            # Общая логика и утилиты
+│   ├── prcs_geojson.py         # Обработка формата GeoJSON
+│   ├── prcs_gpx.py             # Обработка формата GPX
+│   ├── prcs_kml.py             # Обработка формата KML/KMZ
+│   ├── prcs_shp.py             # Обработка формата Shapefile
+│   ├── prcs_topojson.py        # Обработка формата TopoJSON
+│   ├── prcs_wkt.py             # Обработка формата WKT
+│   ├── prcs_nspd_locality.py   # Обработка данных из НСПД
+│   └── prcs_upload.py          # Работа с API Яндекс.Диска
+├── static/                     # Статика для web (CSS, JS, Images)
+├── templates/                  # HTML шаблоны
+└── tests/                      # Unit-тесты
 ```
 
 
