@@ -13,6 +13,7 @@ from modules.prcs_kml import process_kml
 from modules.prcs_topojson import process_topojson
 from modules.prcs_wkt import process_wkt
 from modules.prcs_nspd_locality import process_nspd_locality
+from modules.prcs_nspd_border import process_nspd_border
 from modules.prcs_upload import (
     download_index_json,
     upload_index_json,
@@ -212,6 +213,52 @@ def process_nspd_async(log_queue: Queue, session_id: str, registry_number: str) 
             result = process_nspd_locality(registry_number)
             new_data = merge_nmap_output_template(new_data, result)
             logger.info(f"✓ Данные для {registry_number} получены и сконвертированы")
+            
+            logger.info("Загрузка результатов в Блокнот картографа")
+            try:
+                final_index = merge_nmap_output_template(current_index, new_data)
+                upload_index_json(final_index)
+                logger.info("✓ Загружен")
+            except ProcessingError as e:
+                logger.error(f"Ошибка сохранения: {e.message}")
+
+        except ProcessingError as e:
+            logger.error(f"✗ Ошибка: {e.message}")
+        except Exception as e:
+            logger.error(f"✗ Неожиданная ошибка: {str(e)}")
+
+    finally:
+        logger.removeHandler(queue_handler)
+        log_queue.put(None)
+
+
+def process_nspd_border_async(log_queue: Queue, session_id: str, registry_number: str) -> None:
+    queue_handler = _setup_logging(log_queue)
+
+    try:
+        if not registry_number:
+            logger.error("Не указан реестровый номер")
+            return
+
+        try:
+            _ensure_storage_folders()
+        except ProcessingError as e:
+            logger.error(f"Добавьте свой OAuth-токен Яндекс.Диска в config.py")
+            return
+
+        try:
+            current_index = _load_current_index()
+        except ProcessingError as e:
+            logger.error(f"Не удалось загрузить файл index.json: {e.message}")
+            return
+
+        new_data = create_nmap_output_template()
+        logger.info(f"Обработка муниципального образования: {registry_number}")
+
+        try:
+            result = process_nspd_border(registry_number)
+            new_data = merge_nmap_output_template(new_data, result)
+            logger.info(f"✓ Данные МО для {registry_number} получены и сконвертированы")
             
             logger.info("Загрузка результатов в Блокнот картографа")
             try:

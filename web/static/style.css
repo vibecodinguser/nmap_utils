@@ -315,6 +315,80 @@ h2 {
     background: #555;
 }
 
+/* Accordion Styling */
+.accordion {
+    width: 100%;
+    max-width: 750px;
+    margin-bottom: 20px;
+}
+
+.accordion-item {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s ease;
+}
+
+.accordion-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--card-bg);
+    transition: background-color 0.2s ease;
+}
+
+.accordion-header:hover {
+    background-color: #FAFAFA;
+}
+
+.accordion-title {
+    font-weight: 500;
+    font-size: 1em;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.accordion-icon {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.accordion-icon.active {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: var(--card-bg);
+}
+
+.accordion-content.active {
+    max-height: 1000px;
+}
+
+.accordion-body {
+    padding: 20px;
+    color: var(--text-color);
+    line-height: 1.6;
+    border-top: 1px solid var(--border-color);
+    text-align: justify;
+    font-size: 12px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .button-grid {

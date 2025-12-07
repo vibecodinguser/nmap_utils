@@ -1,21 +1,23 @@
-import os
 import logging
-import uuid
+import os
 import threading
+import uuid
 from queue import Queue
+
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+
+from modules.prcs_async_log import create_sse_stream, process_upload_async, process_nspd_async, \
+    process_nspd_border_async
 from modules.prcs_flow import create_nmap_output_template, merge_nmap_output_template, ProcessingError
-from modules.prcs_shp import process_zip
 from modules.prcs_geojson import process_geojson
 from modules.prcs_gpx import process_gpx
 from modules.prcs_kml import process_kml
+from modules.prcs_shp import process_zip
 from modules.prcs_topojson import process_topojson
-from modules.prcs_wkt import process_wkt
 from modules.prcs_upload import download_index_json, upload_index_json, ensure_folder, get_current_day_folder_path, \
     BASE_FOLDER_PATH
-from modules.prcs_async_log import create_sse_stream, process_upload_async, allowed_file as async_allowed_file, \
-    process_nspd_async
+from modules.prcs_wkt import process_wkt
 
 app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
 
@@ -160,7 +162,7 @@ def stream_logs(session_id):
 
 @app.route('/upload-async', methods=['POST'])
 def upload_async():
-    """Async upload endpoint that processes files and streams logs"""
+    """Эндпоинт асинхронной загрузки, который обрабатывает файлы и транслирует логи"""
 
     session_id = str(uuid.uuid4())
     log_queue = Queue()
@@ -169,8 +171,6 @@ def upload_async():
     uploaded_files = request.files.getlist('files')
     uploaded_files = [f for f in uploaded_files if f.filename != '']
 
-    # Save files to temp directory before background processing
-    # File objects can't be used after request context ends
     temp_files = []
     for file in uploaded_files:
         if file and allowed_file(file.filename):
@@ -179,7 +179,6 @@ def upload_async():
             file.save(temp_path)
             temp_files.append((temp_path, filename))
 
-    # Start processing in background thread with file paths instead of file objects
     thread = threading.Thread(
         target=process_upload_async,
         args=(log_queue, session_id, temp_files)
@@ -192,17 +191,34 @@ def upload_async():
 
 @app.route('/upload-nspd-async', methods=['POST'])
 def upload_nspd_async():
-    """Async upload endpoint for NSPD registry number processing"""
+    """Эндпоинт асинхронной загрузки номера НСПД"""
 
     session_id = str(uuid.uuid4())
     log_queue = Queue()
     log_queues[session_id] = log_queue
 
     registry_number = request.form.get('registry_number')
-
-    # Start processing in background thread
     thread = threading.Thread(
         target=process_nspd_async,
+        args=(log_queue, session_id, registry_number)
+    )
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'session_id': session_id})
+
+
+@app.route('/upload-nspd-border-async', methods=['POST'])
+def upload_nspd_border_async():
+    """Эндпоинт асинхронной загрузки границ муниципальных образований из НСПД"""
+
+    session_id = str(uuid.uuid4())
+    log_queue = Queue()
+    log_queues[session_id] = log_queue
+
+    registry_number = request.form.get('registry_number')
+    thread = threading.Thread(
+        target=process_nspd_border_async,
         args=(log_queue, session_id, registry_number)
     )
     thread.daemon = True
